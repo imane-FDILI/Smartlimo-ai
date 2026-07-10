@@ -1,0 +1,587 @@
+text,intent
+Hi,greeting
+Hello,greeting
+Hey,greeting
+Good morning,greeting
+Good afternoon,greeting
+Good evening,greeting
+Hi there,greeting
+Hello there,greeting
+Hey there,greeting
+Hiya,greeting
+Greetings,greeting
+Hello good day,greeting
+hi,greeting
+hey whats up,greeting
+yo,greeting
+Morning,greeting
+Good day,greeting
+Hi I need some help,greeting
+Hello I have a question,greeting
+Hey can you help me,greeting
+Good morning I need assistance,greeting
+Hi is anyone there,greeting
+Hello SmartLimo,greeting
+Hi quick question,greeting
+Hey I just landed,greeting
+Hello I'm new here,greeting
+Hi hope you can help,greeting
+hello i need help,greeting
+Hello is this the limo service,greeting
+Hi I just arrived in Orlando,greeting
+Hey good evening,greeting
+Hello anyone available,greeting
+Hi good morning team,greeting
+I need a limousine tomorrow,book_ride
+I want to book a limo,book_ride
+Can I reserve a car to the airport,book_ride
+I'd like to book a ride for 4 people,book_ride
+Book me a limousine from MCO to Disney,book_ride
+I need a ride from Orlando International Airport,book_ride
+Can you pick me up tomorrow at 2 PM,book_ride
+I want to reserve a limousine for Saturday,book_ride
+I need transportation to Disney World,book_ride
+Book a car for me please,book_ride
+I'd like to schedule a pickup,book_ride
+We need a limo for a wedding next week,book_ride
+Can I book a ride to Port Canaveral,book_ride
+I'm arriving at MCO tomorrow and need a ride to my hotel,book_ride
+I want a limousine for tonight,book_ride
+Need a car asap,book_ride
+i need a limo tomorow,book_ride
+Can you arrange a pickup from Sanford airport,book_ride
+I would like to make a reservation,book_ride
+Reserve a limousine for 6 passengers please,book_ride
+We are landing at 3 PM and need transportation,book_ride
+I need a ride to Universal Studios for my family,book_ride
+Hi I'd like to book a limousine tomorrow at 2 PM from the airport to Disney World for 4 passengers,book_ride
+Can I get a car from my hotel to the cruise terminal,book_ride
+I want to hire a limo for prom night,book_ride
+I need an airport transfer,book_ride
+Book a transfer from the airport to my hotel,book_ride
+I need a pickup at the cruise port,book_ride
+Can I book a car by the hour,book_ride
+I'd like an hourly booking for 3 hours,book_ride
+I need a point to point ride across town,book_ride
+We need a ride from the hotel to the airport on Friday,book_ride
+Pick us up from Port Canaveral after our cruise,book_ride
+I want to book a round trip to the convention center,book_ride
+Cancel my reservation,cancel_booking
+I want to cancel my booking,cancel_booking
+Please cancel my ride,cancel_booking
+I no longer need the limousine,cancel_booking
+Can I cancel my trip,cancel_booking
+I need to cancel my reservation for tomorrow,cancel_booking
+Cancel the limo I booked,cancel_booking
+My plans changed I want to cancel,cancel_booking
+I have to cancel my pickup,cancel_booking
+Please remove my booking,cancel_booking
+I won't need the ride anymore,cancel_booking
+Cancel everything please,cancel_booking
+My flight was cancelled so I don't need the limo,cancel_booking
+i want to cancel,cancel_booking
+How do I cancel my reservation,cancel_booking
+Is it possible to cancel my booking,cancel_booking
+I'd like to call off my ride,cancel_booking
+Cancel my limousine for Saturday,cancel_booking
+We decided not to go please cancel,cancel_booking
+Delete my reservation,cancel_booking
+I need to cancel the car I reserved,cancel_booking
+Can you cancel my trip to Disney,cancel_booking
+Sorry I must cancel my ride,cancel_booking
+cancel my booking pls,cancel_booking
+What is your cancellation policy,cancel_booking
+Will I be charged if I cancel,cancel_booking
+I want to cancel my airport transfer,cancel_booking
+Cancel the hourly booking I made,cancel_booking
+Our event was called off cancel the limo,cancel_booking
+Cancel my ride for tonight please,cancel_booking
+I booked twice by mistake cancel one,cancel_booking
+Please cancel reservation number 123,cancel_booking
+Scrap my booking,cancel_booking
+Change my pickup time,modify_booking
+I want to modify my reservation,modify_booking
+Can I change the destination,modify_booking
+Update my booking please,modify_booking
+I need to reschedule my ride,modify_booking
+Can I change my pickup location,modify_booking
+I want to change the date of my reservation,modify_booking
+Move my pickup to 5 PM instead,modify_booking
+Can we add one more passenger to my booking,modify_booking
+I need to change my reservation to Sunday,modify_booking
+Is it possible to modify my ride,modify_booking
+I want to switch to a bigger vehicle,modify_booking
+Change my booking from 2 PM to 4 PM,modify_booking
+Can I update the number of passengers,modify_booking
+I need to add luggage to my reservation,modify_booking
+My flight changed can I update my pickup time,modify_booking
+Edit my reservation please,modify_booking
+i want to change my booking,modify_booking
+Can you reschedule my limo for next week,modify_booking
+I'd like to change the drop-off address,modify_booking
+Please update my ride details,modify_booking
+We need to change our pickup point,modify_booking
+Can I modify the vehicle type,modify_booking
+Change the time of my reservation,modify_booking
+I made a mistake in my booking can I fix it,modify_booking
+Can I add a stop to my ride,modify_booking
+Add a child seat to my reservation,modify_booking
+I need to make my booking wheelchair accessible,modify_booking
+Push my pickup back one hour,modify_booking
+Can we leave earlier than planned,modify_booking
+Update my flight number on the booking,modify_booking
+Switch my reservation to the Sprinter,modify_booking
+Change my ride to a round trip,modify_booking
+Where is my driver,driver_tracking
+Is my driver on the way,driver_tracking
+How far is my driver,driver_tracking
+When will the driver arrive,driver_tracking
+Track my ride,driver_tracking
+Where is my limousine,driver_tracking
+Is the car close,driver_tracking
+My driver is late where is he,driver_tracking
+Can I see my driver's location,driver_tracking
+How long until my driver arrives,driver_tracking
+What's the ETA of my driver,driver_tracking
+Is my ride here yet,driver_tracking
+Where's the car I booked,driver_tracking
+Can you track my limo,driver_tracking
+wheres my driver,driver_tracking
+The driver hasn't arrived yet,driver_tracking
+Is my chauffeur nearby,driver_tracking
+How many minutes until pickup,driver_tracking
+I'm waiting outside where is my ride,driver_tracking
+Show me where my driver is,driver_tracking
+Did my driver leave already,driver_tracking
+My pickup was 10 minutes ago where is the car,driver_tracking
+Give me an update on my driver,driver_tracking
+Is the limousine on its way,driver_tracking
+When does my car get here,driver_tracking
+What car is my driver in,driver_tracking
+What's my driver's name and phone number,driver_tracking
+Can I contact my driver,driver_tracking
+I can't find my driver at the terminal,driver_tracking
+Which exit should I meet my driver at,driver_tracking
+Is my driver stuck in traffic,driver_tracking
+Send me the live location of my ride,driver_tracking
+How close is my chauffeur now,driver_tracking
+Show my past rides,trip_history
+What are my previous bookings,trip_history
+Can I see my ride history,trip_history
+My reservation history please,trip_history
+List my old trips,trip_history
+Show me my last reservation,trip_history
+What rides have I taken,trip_history
+Can you show my booking history,trip_history
+I want to see my previous trips,trip_history
+Do you have a record of my rides,trip_history
+Show all my reservations,trip_history
+What was my last trip,trip_history
+Can I review my past bookings,trip_history
+my ride history,trip_history
+Where did I go last time,trip_history
+Pull up my previous reservations,trip_history
+I need my trip history for my expense report,trip_history
+Show me the rides from last month,trip_history
+How many trips have I booked with you,trip_history
+Give me a list of my past rides,trip_history
+Can I get receipts for my previous trips,trip_history
+What bookings do I have on file,trip_history
+Display my reservation history,trip_history
+I want to check my old bookings,trip_history
+Have I booked with you before,trip_history
+Show my upcoming and past reservations,trip_history
+What did I book last week,trip_history
+Find my trip from July 2nd,trip_history
+Do you keep a history of my transfers,trip_history
+I need the details of my previous airport transfer,trip_history
+Show my completed rides,trip_history
+List every ride on my account,trip_history
+When was my first booking with you,trip_history
+Can I pay by card,payment
+What payment methods do you accept,payment
+Do you take cash,payment
+How do I pay for my ride,payment
+Is PayPal accepted,payment
+Can I pay with a credit card,payment
+Do you accept American Express,payment
+When do I pay for the reservation,payment
+Can I pay in advance,payment
+Is payment required at booking,payment
+Do you take Apple Pay,payment
+Can I pay the driver directly,payment
+How does payment work,payment
+Can I get an invoice,payment
+Is a deposit required,payment
+can i pay cash,payment
+Do you accept debit cards,payment
+Can I split the payment,payment
+Will I be charged now or later,payment
+I need a receipt for my payment,payment
+My card was declined what do I do,payment
+Can I change my payment method,payment
+Do you accept Venmo,payment
+I want to pay for my reservation now,payment
+Is my payment secure,payment
+Can I pay online,payment
+Charge my card on file,payment
+I was double charged for my ride,payment
+Can I get a refund for my cancelled trip,payment
+Where can I see my payment status,payment
+Do you store my card details,payment
+Pay for my booking with a different card,payment
+Is there a fee for paying by card,payment
+Can I add a tip,tip
+How do I tip my driver,tip
+Is gratuity included,tip
+I want to tip my chauffeur,tip
+Add a 20 percent tip please,tip
+Do drivers expect a tip,tip
+How much should I tip,tip
+Can I tip in cash,tip
+Add gratuity to my bill,tip
+Is a tip already added to the price,tip
+I'd like to leave a tip for the driver,tip
+Can I tip through the app,tip
+Add a 10 dollar tip,tip
+What's the standard tip for a limo driver,tip
+Can I tip after the ride,tip
+Include a tip in my payment,tip
+how do i tip,tip
+Is service charge the same as tip,tip
+I forgot to tip my driver yesterday can I still do it,tip
+Can I adjust the tip amount,tip
+Give my driver an extra 15 dollars,tip
+Do you add automatic gratuity,tip
+I want to reward my driver he was great,tip
+Add a tip to reservation 123,tip
+Can the tip go on my card,tip
+Is tipping mandatory,tip
+How much gratuity is customary in Orlando,tip
+Leave a five star tip for my chauffeur,tip
+Tip my driver 25 percent,tip
+Can I remove the tip I added,tip
+What tip options do you offer,tip
+I'd like to add gratuity for excellent service,tip
+Does the tip go directly to the driver,tip
+How much is a ride to Disney World,pricing
+What are your prices,pricing
+How much does a limo cost,pricing
+What is the price from the airport to my hotel,pricing
+Can you give me a quote,pricing
+How much for a ride from MCO to Universal,pricing
+What's the cost of a stretch limousine,pricing
+How much would it cost for 6 people,pricing
+What are your rates,pricing
+Is there a flat rate to the airport,pricing
+How much do you charge per hour,pricing
+Price for airport transfer please,pricing
+Can I get an estimate for my trip,pricing
+What would a ride to Port Canaveral cost,pricing
+How expensive is an SUV rental,pricing
+whats the price to disney,pricing
+How much is it from Sanford to Kissimmee,pricing
+Do you have any discounts,pricing
+What's your cheapest option,pricing
+Give me a price estimate,pricing
+How much for a round trip to the cruise port,pricing
+What does an hourly booking cost,pricing
+Cost of a limo for a wedding,pricing
+How much would you charge for 30 miles,pricing
+Can you tell me the fare to downtown Orlando,pricing
+Is the price per person or per vehicle,pricing
+Are tolls included in the price,pricing
+How much extra is a child seat,pricing
+Do you charge for waiting time,pricing
+Price difference between sedan and SUV,pricing
+Is there a night surcharge,pricing
+How much to hire a party bus for 4 hours,pricing
+What's the minimum fare,pricing
+What vehicles do you have,vehicle_information
+Which car is best for 8 people,vehicle_information
+Do you have SUVs,vehicle_information
+What is a stretch limousine,vehicle_information
+Tell me about your fleet,vehicle_information
+What kind of cars do you offer,vehicle_information
+Do you have a Mercedes Sprinter,vehicle_information
+Which vehicle fits 10 passengers,vehicle_information
+What's the biggest car you have,vehicle_information
+Do you have luxury sedans,vehicle_information
+How many people fit in the SUV,vehicle_information
+What vehicle do you recommend for a wedding,vehicle_information
+We are 8 people with 10 suitcases which car should we take,vehicle_information
+Do your cars have child seats,vehicle_information
+Is there WiFi in the limousine,vehicle_information
+what cars do u have,vehicle_information
+Which vehicle is best for business travel,vehicle_information
+Do you have party buses,vehicle_information
+Can the sedan fit 4 large suitcases,vehicle_information
+What's the difference between the SUV and the Sprinter,vehicle_information
+Show me your vehicles,vehicle_information
+Do you have Teslas,vehicle_information
+What luxury cars are available,vehicle_information
+I need a car with a lot of luggage space what do you suggest,vehicle_information
+Which limo is good for a group of six,vehicle_information
+Are your vehicles wheelchair accessible,vehicle_information
+How many bags fit in the stretch limousine,vehicle_information
+Do you have black Escalades,vehicle_information
+What amenities are in the party bus,vehicle_information
+Can I choose the color of the limo,vehicle_information
+Which vehicle is best for a night out,vehicle_information
+Recommend a car for 2 people going to a business meeting,vehicle_information
+Do the Sprinters have leather seats,vehicle_information
+Help,help
+I need help,help
+Can you help me,help
+What can you do,help
+How does this work,help
+What services do you offer,help
+I don't know how to use this,help
+help me please,help
+What can I ask you,help
+How do I book a ride here,help
+I'm lost can you guide me,help
+What are my options,help
+Show me what you can do,help
+How does the chatbot work,help
+I need assistance,help
+Can you explain your services,help
+What is SmartLimo,help
+How do I get started,help
+I have a problem,help
+Something is not working,help
+I need support,help
+Can I talk to a human,help
+How do I contact customer service,help
+Is there a phone number I can call,help
+What information do you need from me,help
+Guide me through the booking process,help
+I'm confused,help
+What do you do,help
+Give me some instructions,help
+How can you assist me,help
+Tell me how this works,help
+What features do you have,help
+i dont understand,help
+Thanks,thanks
+Thank you,thanks
+Thank you so much,thanks
+Thanks a lot,thanks
+Many thanks,thanks
+Thanks for your help,thanks
+I appreciate it,thanks
+Thank you for the information,thanks
+That was helpful thanks,thanks
+thx,thanks
+ty,thanks
+Thanks a bunch,thanks
+Much appreciated,thanks
+You've been very helpful,thanks
+Thank you kindly,thanks
+Perfect thank you,thanks
+Great thanks,thanks
+Awesome thank you,thanks
+Thanks for the quick answer,thanks
+That helps a lot thank you,thanks
+Cheers thanks,thanks
+Thank you for booking that,thanks
+You're the best thanks,thanks
+thanks so much,thanks
+Appreciate the help,thanks
+Thanks for sorting that out,thanks
+Thank you very much indeed,thanks
+Big thanks,thanks
+That's exactly what I needed thanks,thanks
+Wonderful thank you,thanks
+Thanks you were super fast,thanks
+Thanks for the recommendation,thanks
+Thank you for your patience,thanks
+Bye,goodbye
+Goodbye,goodbye
+See you later,goodbye
+Have a nice day,goodbye
+OK bye,goodbye
+See ya,goodbye
+I'm done,goodbye
+That's everything bye,goodbye
+bye bye,goodbye
+Catch you later,goodbye
+That's all I needed,goodbye
+Take care,goodbye
+Goodbye and have a good day,goodbye
+No more questions bye,goodbye
+Talk later,goodbye
+Alright bye,goodbye
+Cheers bye,goodbye
+Later,goodbye
+That's all,goodbye
+Nothing else bye,goodbye
+I have to go bye,goodbye
+Gotta go,goodbye
+See you next time,goodbye
+Good night,goodbye
+Bye for now,goodbye
+That will be all,goodbye
+We're done here bye,goodbye
+OK that's it bye,goodbye
+Farewell,goodbye
+Signing off,goodbye
+peace out,goodbye
+Until next time,goodbye
+End the chat please,goodbye
+Yes,confirm
+Yes please,confirm
+Confirm,confirm
+That's correct,confirm
+Sounds good,confirm
+Yeah,confirm
+Yep,confirm
+Sure,confirm
+Absolutely,confirm
+That's right,confirm
+Correct,confirm
+Yes that works,confirm
+Perfect go ahead,confirm
+Yes confirm my booking,confirm
+OK confirm it,confirm
+yes pls,confirm
+Sounds perfect,confirm
+That works for me,confirm
+Go ahead and book it,confirm
+Yes I confirm,confirm
+All good confirm,confirm
+Yes everything is correct,confirm
+Confirm the reservation,confirm
+ok yes,confirm
+Yup that's fine,confirm
+Definitely,confirm
+Of course,confirm
+Yes book it now,confirm
+Looks good to me,confirm
+Proceed please,confirm
+You got it right,confirm
+Yes do it,confirm
+I agree go ahead,confirm
+No,deny
+No thanks,deny
+Not now,deny
+That's wrong,deny
+I don't want that,deny
+Nope,deny
+No that's not right,deny
+Not really,deny
+No don't do that,deny
+That's incorrect,deny
+No I changed my mind,deny
+Not interested,deny
+No cancel that,deny
+no thank you,deny
+That's not what I meant,deny
+No wait,deny
+Don't confirm yet,deny
+No the time is wrong,deny
+No the pickup is incorrect,deny
+Nah,deny
+Not exactly,deny
+No let me change something,deny
+Stop no,deny
+No that's a mistake,deny
+Hold on that's not right,deny
+Negative,deny
+No don't book it,deny
+Wait that's the wrong date,deny
+No the destination is wrong,deny
+Not quite,deny
+No that's too expensive,deny
+Absolutely not,deny
+No never mind,deny
+Tell me more about the Sedan,vehicle_information
+What is the Premium SUV like,vehicle_information
+Describe the Transit VAN,vehicle_information
+What's inside the Sprinter VAN,vehicle_information
+How many seats does the Executive SUV have,vehicle_information
+What is the seating capacity of the Sedan,vehicle_information
+Does the Sprinter have USB chargers,vehicle_information
+Is there air conditioning in the vans,vehicle_information
+What color are your SUVs,vehicle_information
+Are your vehicles new models,vehicle_information
+Do the vans have tinted windows,vehicle_information
+What features does the Premium SUV include,vehicle_information
+Tell me the specs of the Transit VAN,vehicle_information
+What is the luggage capacity of the Sedan,vehicle_information
+Does the Executive SUV have leather seats,vehicle_information
+Which of your vehicles has the most room,vehicle_information
+What year are your vehicles,vehicle_information
+Do you have vehicles with sunroofs,vehicle_information
+Is there a TV screen in the Sprinter,vehicle_information
+What brands are your cars,vehicle_information
+I wish to cancel my limousine reservation,cancel_booking
+Terminate my booking please,cancel_booking
+I want my reservation cancelled,cancel_booking
+Void my booking,cancel_booking
+Please cancel the pickup I scheduled,cancel_booking
+Cancel my airport pickup for Friday,cancel_booking
+I'm calling off the limousine,cancel_booking
+Abort my reservation,cancel_booking
+I would like to cancel the car I ordered,cancel_booking
+Cancel my whole trip please,cancel_booking
+Withdraw my booking,cancel_booking
+Drop my reservation,cancel_booking
+I don't want the limo anymore cancel it,cancel_booking
+Cancel booking number 456,cancel_booking
+Please cancel my Sunday reservation,cancel_booking
+Get rid of my booking,cancel_booking
+Cancel the Sprinter I reserved,cancel_booking
+I need to cancel due to an emergency,cancel_booking
+Our flight changed cancel the pickup,cancel_booking
+Cancel my hourly reservation,cancel_booking
+What is your fare structure,pricing
+How much do I owe for the trip,pricing
+What's the total cost of my booking,pricing
+Give me the fare from the airport to Kissimmee,pricing
+How is the price calculated,pricing
+Is pricing based on distance or time,pricing
+What's the rate per mile,pricing
+Send me a price quote for tomorrow,pricing
+How much will my reservation cost in total,pricing
+What does a one way transfer cost,pricing
+Quote me a price for an airport run,pricing
+What is the fee for a late night ride,pricing
+Ballpark price for a ride to Tampa,pricing
+How much cheaper is the Sedan than the SUV,pricing
+What's the fare estimate for 20 miles,pricing
+Are prices higher on weekends,pricing
+How much does the meet and greet cost,pricing
+Is gratuity included in the quoted price,pricing
+What's the base fare,pricing
+Estimate the cost of my trip please,pricing
+Bring up my account history,trip_history
+What trips are on my account,trip_history
+Look up my past reservations,trip_history
+Retrieve my booking records,trip_history
+I want a summary of all my rides,trip_history
+Access my previous transfers,trip_history
+What rides did I take in June,trip_history
+Fetch my reservation from last Tuesday,trip_history
+Check my account for old bookings,trip_history
+What's in my ride log,trip_history
+Review my completed trips,trip_history
+Find my past airport pickups,trip_history
+My previous rides please,trip_history
+Show the trips I already took,trip_history
+Look at my booking archive,trip_history
+What reservations have I made this year,trip_history
+Get my travel history,trip_history
+Recap my rides from this month,trip_history
+See my earlier bookings,trip_history
+Open my trip records,trip_history
+Amend my reservation,modify_booking
+Correct the time on my booking,modify_booking
+Adjust my pickup details,modify_booking
+Revise my reservation for Saturday,modify_booking
+Swap my Sedan for a Premium SUV,modify_booking
+Alter the drop-off point on my booking,modify_booking
+Postpone my ride to next weekend,modify_booking
+Bring my pickup forward to noon,modify_booking
+Update the passenger count to 5,modify_booking
+Fix the wrong address in my reservation,modify_booking
