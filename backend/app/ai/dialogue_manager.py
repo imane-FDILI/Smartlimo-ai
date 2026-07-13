@@ -3,7 +3,6 @@ import uuid
 
 from app.ai.intent_classifier import predict_intent
 from app.ai.entity_extractor import extract_entities
-from sqlalchemy.orm import Session
 
 SESSIONS = {}
 
@@ -146,13 +145,6 @@ def _acknowledge(captured: list, slots: dict) -> str:
     items = ", ".join(f"{SLOT_LABELS[k]}: {slots[k]}" for k in captured)
     return f"Great! I already have - {items}.\n"
 
-def _format_history(reservations) -> str:
-    if not reservations:
-        return "I couldn't find any reservations for this email. Would you like to book a ride?"
-    lines = [f"You have {len(reservations)} reservation(s):", ""]
-    for r in reservations:
-        lines.append(f"#{r.id} - {r.pickup_location} to {r.dropoff_location} on {r.pickup_date} at {r.pickup_time} - {r.status}")
-    return "\n".join(lines)
 
 def _format_history(reservations) -> str:
     if not reservations:
@@ -162,7 +154,19 @@ def _format_history(reservations) -> str:
         lines.append(f"#{r.id} - {r.pickup_location} to {r.dropoff_location} on {r.pickup_date} at {r.pickup_time} - {r.status}")
     return "\n".join(lines)
 
-def handle_message( conversation_id: str | None, message: str) -> dict:
+
+def _lookup_history(email: str) -> str:
+    from app.database import SessionLocal
+    from app.services.reservation_service import get_user_reservations
+    db = SessionLocal()
+    try:
+        reservations = get_user_reservations(db, email)
+    finally:
+        db.close()
+    return _format_history(reservations)
+
+
+def handle_message(conversation_id: str | None, message: str) -> dict:
     if not conversation_id or conversation_id not in SESSIONS:
         conversation_id = str(uuid.uuid4())
         SESSIONS[conversation_id] = _new_session()
@@ -174,14 +178,7 @@ def handle_message( conversation_id: str | None, message: str) -> dict:
 
     if session.get("expected") == "history_email" and session["slots"].get("email"):
         session["expected"] = None
-        from app.database import SessionLocal
-        from app.services.reservation_service import get_user_reservations
-        db = SessionLocal()
-        try:
-            reservations = get_user_reservations(db, session["slots"]["email"])
-        finally:
-            db.close()
-        return _reply(conversation_id, _format_history(reservations))
+        return _reply(conversation_id, _lookup_history(session["slots"]["email"]))
 
     if session["stage"] in ("collecting", "confirming"):
 
@@ -240,32 +237,14 @@ def handle_message( conversation_id: str | None, message: str) -> dict:
             SESSIONS[conversation_id] = _new_session()
             return _reply(conversation_id, f"Your reservation #{rid} has been cancelled. We hope to see you again soon!")
         return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+
     if intent == "trip_history":
         email = session["slots"].get("email")
         if email:
-            from app.database import SessionLocal
-            from app.services.reservation_service import get_user_reservations
-            db = SessionLocal()
-            try:
-                reservations = get_user_reservations(db, email)
-            finally:
-                db.close()
-            return _reply(conversation_id, _format_history(reservations))
+            return _reply(conversation_id, _lookup_history(email))
         session["expected"] = "history_email"
         return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
-    if intent == "trip_history":
-        email = session["slots"].get("email")
-        if email:
-            from app.database import SessionLocal
-            from app.services.reservation_service import get_user_reservations
-            db = SessionLocal()
-            try:
-                reservations = get_user_reservations(db, email)
-            finally:
-                db.close()
-            return _reply(conversation_id, _format_history(reservations))
-        session["expected"] = "history_email"
-        return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
+
     if intent == "book_ride":
         session["stage"] = "collecting"
         captured = _merge_entities(session["slots"], entities)
@@ -277,33 +256,9 @@ def handle_message( conversation_id: str | None, message: str) -> dict:
         session["stage"] = "confirming"
         return _reply(conversation_id, _summary(session["slots"]))
 
-    if session.get("expected") == "history_email":
-        m = EMAIL_RE.search(message)
-        if not m:
-            return _reply(conversation_id, "Sorry, that doesn't look like a valid email address. Could you try again?")
-        session["slots"]["email"] = m.group()
-        session["expected"] = None
-        from app.database import SessionLocal
-        from app.services.reservation_service import get_user_reservations
-        db = SessionLocal()
-        try:
-            reservations = get_user_reservations(db, email=session["slots"]["email"])
-        finally:
-            db.close()
-        return _reply(conversation_id, _format_history(reservations))
-
-    if session.get("expected"):
-        _fill_expected(session["slots"], session["expected"], message)
-        key, question = _next_missing(session["slots"])
-        if key:
-            session["expected"] = key
-            return _reply(conversation_id, question)
-        session["stage"] = "confirming"
-        return _reply(conversation_id, _summary(session["slots"]))
     reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])
     return _reply(conversation_id, reply)
 
 
 def _reply(conversation_id: str, text: str) -> dict:
     return {"conversation_id": conversation_id, "reply": text}
-
