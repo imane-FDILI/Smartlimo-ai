@@ -66,20 +66,8 @@ def cancel_reservation(db: Session, reservation_id: int) -> bool:
     return False
 
 
-def get_user_reservations(db: Session, email: str = None, phone: str = None) -> list[Reservation]:
-    if email:
-        user = db.query(User).filter(User.email == email).first()
-    elif phone:
-        user = db.query(User).filter(User.phone == phone).first()
-    else:
+def get_user_reservations(db, email):
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
         return []
-
-    if not user:
-        return []
-
-    return (
-        db.query(Reservation)
-        .filter(Reservation.user_id == user.id)
-        .order_by(Reservation.pickup_date.desc(), Reservation.pickup_time.desc())
-        .all()
-    )
+    return db.query(Reservation).filter(Reservation.user_id == user.id).all()

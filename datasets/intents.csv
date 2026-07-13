@@ -66,6 +66,14 @@ I need a point to point ride across town,book_ride
 We need a ride from the hotel to the airport on Friday,book_ride
 Pick us up from Port Canaveral after our cruise,book_ride
 I want to book a round trip to the convention center,book_ride
+Can I have a limo,book_ride
+Can I have a limousine please,book_ride
+Can I get a limo,book_ride
+Can I get a ride to the airport,book_ride
+I would like to have a car,book_ride
+Can I order a limo,book_ride
+I want to order a ride,book_ride
+Get me a limo please,book_ride
 Cancel my reservation,cancel_booking
 I want to cancel my booking,cancel_booking
 Please cancel my ride,cancel_booking
