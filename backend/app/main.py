@@ -3,10 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
 from app import models
-from app.routers import chat, reservations
+from app.routers import chat, reservations, geo
 
 app = FastAPI(title="SmartLimo AI API")
-
+app.include_router(geo.router)
 
 # Crée les SmartLimo AItables dans PostgreSQL au démarrage
 @app.on_event("startup")

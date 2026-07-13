@@ -4,6 +4,7 @@ import dateparser
 from sqlalchemy.orm import Session
 
 from app.models import User, Reservation
+from app.services.geo_service import get_route
 
 
 def get_or_create_user(db: Session, name: str, email: str, phone: str) -> User:
@@ -71,6 +72,15 @@ def get_user_reservations(db, email):
     if user is None:
         return []
     return db.query(Reservation).filter(Reservation.user_id == user.id).all()
+
+def get_reservation_route(db: Session, reservation_id: int):
+    # Retourne le trajet (distance/duree/coordonnees) de la reservation via geo_service,
+    # ou None si la reservation n'existe pas ou si un des lieux est introuvable.
+    reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+    if reservation is None or not reservation.dropoff_location:
+        return None
+    return get_route(reservation.pickup_location, reservation.dropoff_location)
+
 
 def update_reservation(db: Session, reservation_id: int, field: str, value) -> bool:
     # db: Session        -> la connexion base de donnees (le "panier")

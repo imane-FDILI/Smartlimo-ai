@@ -298,6 +298,20 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         session["expected"] = "modify_detail"
         return _reply(conversation_id, "Sure! What would you like to change? (for example: change my pickup time to 5pm)")
 
+    if intent == "driver_tracking" and session.get("reservation_id"):
+        from app.database import SessionLocal
+        from app.services.reservation_service import get_reservation_route
+        db = SessionLocal()
+        try:
+            route = get_reservation_route(db, session["reservation_id"])
+        finally:
+            db.close()
+        if route:
+            return _reply(conversation_id,
+                f"Your trip is {route['distance_km']} km, about {route['duration_min']} min "
+                f"from your pickup to your destination.")
+        return _reply(conversation_id, "Sorry, I couldn't calculate the route for that reservation.")
+
     if intent == "trip_history":
         email = session["slots"].get("email")
         if email:

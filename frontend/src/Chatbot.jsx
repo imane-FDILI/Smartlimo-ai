@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useState, useRef, useEffect } from "react";
+import TripMap from "./TripMap";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -10,6 +11,7 @@ function Chatbot({ onClose }) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
+  const [tripInfo, setTripInfo] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -34,6 +36,20 @@ const response = await axios.post(`${API_URL}/chat/`, {
         ...prev,
         { sender: "bot", text: response.data.reply },
       ]);
+
+      // si le bot affiche le resume -> on va chercher le trajet pour la carte
+      const data = response.data;
+      if (data.reply.includes("reservation summary")) {
+        const pickupMatch = data.reply.match(/- Pickup: (.+)/);
+        const dropoffMatch = data.reply.match(/- Destination: (.+)/);
+        if (pickupMatch && dropoffMatch) {
+          axios.get(`${API_URL}/route/`, {
+            params: { pickup: pickupMatch[1].trim(), dropoff: dropoffMatch[1].trim() }
+          }).then(res => {
+            if (!res.data.error) setTripInfo(res.data);
+          });
+        }
+      }
     } catch (error) {
     console.log(error);
     console.log(error.response);
@@ -47,6 +63,7 @@ const response = await axios.post(`${API_URL}/chat/`, {
       setIsLoading(false);
     }
   };
+  
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") sendMessage();
@@ -66,6 +83,14 @@ const response = await axios.post(`${API_URL}/chat/`, {
           </div>
         ))}
         {isLoading && <div className="message bot">...</div>}
+        {tripInfo && (
+          <TripMap
+            pickupCoords={tripInfo.pickup_coords}
+            dropoffCoords={tripInfo.dropoff_coords}
+            distanceKm={tripInfo.distance_km}
+            durationMin={tripInfo.duration_min}
+          />
+        )}
         <div ref={messagesEndRef} />
       </div>
 
