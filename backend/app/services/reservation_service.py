@@ -71,3 +71,31 @@ def get_user_reservations(db, email):
     if user is None:
         return []
     return db.query(Reservation).filter(Reservation.user_id == user.id).all()
+
+def update_reservation(db: Session, reservation_id: int, field: str, value) -> bool:
+    # db: Session        -> la connexion base de donnees (le "panier")
+    # reservation_id: int -> le numero de la reservation a modifier
+    # field: str          -> le NOM de la colonne a changer (ex: "pickup_time")
+    # value               -> la nouvelle valeur (pas de type precise : peut etre heure, date, texte...)
+    # -> bool             -> la fonction promet de retourner True ou False
+
+    # ETAPE 1 : chercher la ligne dont l'id correspond
+    # .first() renvoie l'objet trouve, ou None si aucun
+    reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+
+    # ETAPE 2 : cas limite - reservation inexistante
+    if reservation is None:
+        return False
+
+    # ETAPE 3 : modifier le champ dont le NOM est dans la variable field
+    # setattr(objet, "nom_attribut", valeur) est l'equivalent dynamique de :
+    #   reservation.pickup_time = valeur
+    # mais ou "pickup_time" peut etre n'importe quelle colonne selon le cas
+    setattr(reservation, field, value)
+
+    # ETAPE 4 : enregistrer le changement dans PostgreSQL
+    # (pas besoin de db.add() : l'objet vient de la base, SQLAlchemy
+    #  detecte tout seul qu'il a ete modifie)
+    db.commit()
+
+    return True

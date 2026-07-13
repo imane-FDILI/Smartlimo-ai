@@ -164,7 +164,53 @@ def _lookup_history(email: str) -> str:
     finally:
         db.close()
     return _format_history(reservations)
+def _apply_modification(session: dict, entities: dict) -> str | None:
+    # Regarde ce que l'extracteur a capte dans le message et modifie
+    # la reservation en consequence. Retourne le texte de confirmation,
+    # ou None si rien d'exploitable n'a ete capte.
 
+    # Table de correspondance : entite captee -> colonne de la base
+    # Chaque tuple : (cle dans entities, nom de la colonne, besoin de conversion)
+    FIELD_MAP = [
+        ("time", "pickup_time", "time"),
+        ("date", "pickup_date", "date"),
+        ("pickup_location", "pickup_location", None),
+        ("dropoff_location", "dropoff_location", None),
+        ("passengers", "passengers", None),
+        ("luggage", "luggage", None),
+    ]
+
+    # les imports sont ici (imports "locaux") pour eviter un import circulaire :
+    # reservation_service et dialogue_manager ne doivent pas s'importer en boucle
+    from app.database import SessionLocal
+    from app.services.reservation_service import update_reservation, parse_date, parse_time
+
+    for entity_key, column_name, conversion in FIELD_MAP:
+        value = entities.get(entity_key)          # .get() renvoie None si absent
+        if value is None:
+            continue                              # rien capte pour cette entite -> suivante
+
+        # conversion du texte libre ("5pm", "tomorrow") vers un vrai type SQL
+        if conversion == "time":
+            value = parse_time(str(value))
+        elif conversion == "date":
+            value = parse_date(str(value))
+
+        db = SessionLocal()
+        try:
+            ok = update_reservation(db, session["reservation_id"], column_name, value)
+        finally:
+            db.close()                            # toujours rendre la connexion
+
+        if ok:
+            # f-string : les {} inserent les valeurs des variables dans le texte
+            return f"Done! Your {column_name.replace('_', ' ')} has been updated to {value}."
+        return "Sorry, I couldn't find that reservation."
+
+    # la boucle s'est terminee sans rien capter -> None (l'appelant demandera des precisions)
+    return None
+
+    
 
 def handle_message(conversation_id: str | None, message: str) -> dict:
     if not conversation_id or conversation_id not in SESSIONS:
@@ -179,7 +225,14 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
     if session.get("expected") == "history_email" and session["slots"].get("email"):
         session["expected"] = None
         return _reply(conversation_id, _lookup_history(session["slots"]["email"]))
-
+    
+    if session.get("expected") == "modify_detail" and session.get("reservation_id"):
+        session["expected"] = None
+        confirmation = _apply_modification(session, entities)
+        if confirmation:
+            return _reply(conversation_id, confirmation)
+        return _reply(conversation_id, "I didn't catch what to change. Try: 'change my pickup time to 5pm'.")
+    
     if session["stage"] in ("collecting", "confirming"):
 
         if intent == "cancel_booking":
@@ -238,13 +291,20 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             return _reply(conversation_id, f"Your reservation #{rid} has been cancelled. We hope to see you again soon!")
         return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
 
+    if intent == "modify_booking" and session.get("reservation_id"):
+        confirmation = _apply_modification(session, entities)
+        if confirmation:
+            return _reply(conversation_id, confirmation)
+        session["expected"] = "modify_detail"
+        return _reply(conversation_id, "Sure! What would you like to change? (for example: change my pickup time to 5pm)")
+
     if intent == "trip_history":
         email = session["slots"].get("email")
         if email:
             return _reply(conversation_id, _lookup_history(email))
         session["expected"] = "history_email"
         return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
-
+            
     if intent == "book_ride":
         session["stage"] = "collecting"
         captured = _merge_entities(session["slots"], entities)

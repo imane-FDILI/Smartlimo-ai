@@ -15,7 +15,7 @@ from spacy.matcher import PhraseMatcher
 from spacy.util import filter_spans
 
 # --- chargement
-BASE_DIR = Path(__file__).resolve().parents[2]              # backend/
+BASE_DIR = Path(__file__).resolve().parents[2] # backend/
 ENTITIES_PATH = BASE_DIR.parent / "datasets" / "entities.json"
 
 nlp = spacy.load("en_core_web_sm")
@@ -51,7 +51,7 @@ for category, items in GAZETTEER.items():
         patterns = [nlp.make_doc(t) for t in terms]
         matcher.add(f"{label}::{item['name']}", patterns)
 
-# ---------------------------------------------------------------- règles regex
+# règles regex
 WORD_NUMBERS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
     "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
@@ -81,7 +81,7 @@ def _to_number(value: str) -> int:
     return int(value) if value.isdigit() else WORD_NUMBERS.get(value, 0)
 
 
-# ---------------------------------------------------------------- extraction
+# -extraction
 def extract_entities(text: str) -> dict:
     """Analyse un message et retourne les slots détectés."""
     doc = nlp(text)
@@ -101,7 +101,7 @@ def extract_entities(text: str) -> dict:
 
     # --- 1. Gazetteer : lieux, véhicules, services, occasions, extras
     spans = [doc[s:e] for _, s, e in matcher(doc)]
-    spans = filter_spans(spans)          # garde les correspondances les plus longues
+    spans = filter_spans(spans)  # garde les correspondances les plus longues
 
     locations = []
     for span in spans:
