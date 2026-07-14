@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Chatbot from "./Chatbot";
-import chatIcon from "./assets/chat-icon.png";
 import "./App.css";
 
 function App() {
@@ -20,10 +19,14 @@ function App() {
 
       {/* Icône flottante : toujours visible, ouvre/ferme le chat */}
       <button
-        className="chat-button"
+        className="chat-launcher"
         onClick={() => setIsChatOpen(!isChatOpen)}
       >
-        <img src={chatIcon} alt="Chat" className="chat-icon" />
+        <img src="/launcher-van.png" alt="SmartLimo" className="launcher-van" />
+        <div className="launcher-text">
+          <span className="launcher-question">Ask SmartLimo</span>
+          <span className="launcher-cta">Get Instant Quote</span>
+        </div>
       </button>
 
       {/* Fenêtre du chatbot, au-dessus de l'icône */}

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date, time
 import dateparser
 from sqlalchemy.orm import Session
 
-from app.models import User, Reservation
+from app.models import User, Reservation, Vehicle
 from app.services.geo_service import get_route
 
 
@@ -109,3 +109,14 @@ def update_reservation(db: Session, reservation_id: int, field: str, value) -> b
     db.commit()
 
     return True
+
+def recommend_vehicle(db: Session, passengers: int, luggage: int = 0):
+    return db.query(Vehicle).filter(
+        Vehicle.capacity >= passengers,
+        Vehicle.luggage >= luggage
+    ).order_by(Vehicle.capacity).first()
+
+def estimate_price(db: Session, distance_km: float, vehicle_name: str = None) -> float:
+    vehicle = db.query(Vehicle).filter(Vehicle.name == vehicle_name).first()
+    ppk = vehicle.price_per_km if vehicle else 3.0
+    return round(10.0 + distance_km * ppk, 2)
