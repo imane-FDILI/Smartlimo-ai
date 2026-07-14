@@ -1,6 +1,8 @@
 import re
 import uuid
 
+from sqlalchemy.orm import Session
+
 from app.ai.intent_classifier import predict_intent
 from app.ai.entity_extractor import extract_entities
 
@@ -135,9 +137,10 @@ def _summary(slots: dict) -> str:
             lines.append(f"- {SLOT_LABELS[key]}: {slots[key]}")
     if slots.get("extras"):
         lines.append(f"- Extras: {', '.join(slots['extras'])}")
+    if slots.get("estimated_price"):
+        lines.append(f"- Estimated price: ${slots['estimated_price']}")
     lines += ["", "Would you like to confirm your reservation?"]
     return "\n".join(lines)
-
 
 def _acknowledge(captured: list, slots: dict) -> str:
     if len(captured) < 2:
@@ -164,6 +167,20 @@ def _lookup_history(email: str) -> str:
     finally:
         db.close()
     return _format_history(reservations)
+
+def _compute_price(slots: dict):
+    from app.database import SessionLocal
+    from app.services.geo_service import get_route
+    from app.services.reservation_service import estimate_price
+    route = get_route(slots.get("pickup_location", ""), slots.get("dropoff_location", ""))
+    if route is None:
+        return
+    db = SessionLocal()
+    try:
+        slots["estimated_price"] = estimate_price(db, route["distance_km"], slots.get("vehicle"))
+    finally:
+        db.close()
+        
 def _apply_modification(session: dict, entities: dict) -> str | None:
     # Regarde ce que l'extracteur a capte dans le message et modifie
     # la reservation en consequence. Retourne le texte de confirmation,
@@ -273,10 +290,24 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         key, question = _next_missing(session["slots"])
         if key:
             session["expected"] = key
-            return _reply(conversation_id, _acknowledge(captured, session["slots"]) + question)
+            prefix = ""
+            if key == "vehicle":
+                # on connait deja passengers et luggage -> on recommande !
+                from app.database import SessionLocal
+                from app.services.reservation_service import recommend_vehicle
+                db = SessionLocal()
+                try:
+                    v = recommend_vehicle(db, session["slots"].get("passengers") or 1,
+                                          session["slots"].get("luggage") or 0)
+                finally:
+                    db.close()
+                if v:
+                    prefix = f"Based on {session['slots'].get('passengers')} passenger(s) and {session['slots'].get('luggage')} bag(s), I recommend the {v.name}.\n"
+            return _reply(conversation_id, _acknowledge(captured, session["slots"]) + prefix + question)
+        _compute_price(session["slots"])
         session["stage"] = "confirming"
         return _reply(conversation_id, _summary(session["slots"]))
-
+    
     if intent == "cancel_booking" and session.get("reservation_id"):
         from app.database import SessionLocal
         from app.services.reservation_service import cancel_reservation
@@ -327,12 +358,27 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             session["expected"] = key
             prefix = _acknowledge(captured, session["slots"]) or "Great! Let's book your ride.\n"
             return _reply(conversation_id, prefix + question)
+        _compute_price(session["slots"])
+        session["stage"] = "confirming"
+        return _reply(conversation_id, _summary(session["slots"]))
+    
         session["stage"] = "confirming"
         return _reply(conversation_id, _summary(session["slots"]))
 
     reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])
     return _reply(conversation_id, reply)
 
+def recommend_vehicle(db: Session, passengers: int, luggage: int = 0):
+    return db.query(Vehicle).filter(
+        Vehicle.capacity >= passengers,
+        Vehicle.luggage >= luggage
+    ).order_by(Vehicle.capacity).first()
+
+
+def estimate_price(db: Session, distance_km: float, vehicle_name: str = None) -> float:
+    vehicle = db.query(Vehicle).filter(Vehicle.name == vehicle_name).first()
+    ppk = vehicle.price_per_km if vehicle else 3.0
+    return round(10.0 + distance_km * ppk, 2)
 
 def _reply(conversation_id: str, text: str) -> dict:
     return {"conversation_id": conversation_id, "reply": text}
