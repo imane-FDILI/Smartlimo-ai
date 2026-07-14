@@ -50,6 +50,7 @@ def create_reservation(db: Session, slots: dict) -> Reservation:
         passengers=slots.get("passengers") or 1,
         luggage=slots.get("luggage") if slots.get("luggage") is not None else 0,
         status="confirmed",
+        price=slots.get("estimated_price"),
     )
     db.add(reservation)
     db.commit()

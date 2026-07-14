@@ -50,6 +50,8 @@ body {
   padding: 6px 18px 6px 6px;
   box-shadow: 0 6px 20px rgba(212, 175, 55, 0.45);
   transition: transform 0.2s;
+  padding: 6px 18px 6px 12px;    /* plus d'air à gauche */
+  overflow: hidden;               /* rien ne depasse de la pilule */
 }
 
 .chat-launcher:hover {
@@ -57,7 +59,7 @@ body {
 }
 
 .launcher-van {
-  height: 50px;
+  height: 44px;                   /* un peu plus petit */
   width: auto;
 }
 
