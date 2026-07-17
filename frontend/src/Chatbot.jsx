@@ -5,15 +5,19 @@ import TripMap from "./TripMap";
 const API_URL = "http://127.0.0.1:8000";
 
 function Chatbot({ onClose }) {
+  // Historique des messages affichés (bot + utilisateur), avec le message d'accueil initial
   const [messages, setMessages] = useState([
     { sender: "bot", text: "Hello!  Welcome to SmartLimo AI.I'm here to help you book your limousine in just a few messages.Where would you like to be picked up?" },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // Id renvoyé par le backend pour garder le fil de la conversation entre chaque appel
   const [conversationId, setConversationId] = useState(null);
+  // Données du trajet (coordonnées, distance, geometry) une fois le resume de reservation détecté
   const [tripInfo, setTripInfo] = useState(null);
   const messagesEndRef = useRef(null);
 
+  // Auto-scroll vers le dernier message à chaque nouveau message ou changement de statut de chargement
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
@@ -27,7 +31,7 @@ function Chatbot({ onClose }) {
     setIsLoading(true);
 
     try {
-const response = await axios.post(`${API_URL}/chat/`, {
+      const response = await axios.post(`${API_URL}/chat/`, {
         message: userMessage.text,
         conversation_id: conversationId,
       });
@@ -37,7 +41,8 @@ const response = await axios.post(`${API_URL}/chat/`, {
         { sender: "bot", text: response.data.reply },
       ]);
 
-      // si le bot affiche le resume -> on va chercher le trajet pour la carte
+      // Si le bot affiche le resume de reservation -> on extrait pickup/destination
+      // du texte de la réponse pour aller chercher le trajet (route) et l'afficher sur la carte
       const data = response.data;
       if (data.reply.includes("reservation summary")) {
         const pickupMatch = data.reply.match(/- Pickup: (.+)/);
@@ -51,20 +56,20 @@ const response = await axios.post(`${API_URL}/chat/`, {
         }
       }
     } catch (error) {
-    console.log(error);
-    console.log(error.response);
-    console.log(error.message);
+      console.log(error);
+      console.log(error.response);
+      console.log(error.message);
 
-    setMessages((prev) => [
+      setMessages((prev) => [
         ...prev,
         { sender: "bot", text: "Sorry, I can't reach the server." },
-    ]);
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
-  
 
+  // Envoi du message avec la touche Entrée
   const handleKeyDown = (e) => {
     if (e.key === "Enter") sendMessage();
   };
@@ -83,12 +88,14 @@ const response = await axios.post(`${API_URL}/chat/`, {
           </div>
         ))}
         {isLoading && <div className="message bot">...</div>}
+        {/* Carte affichée uniquement une fois le trajet resolu depuis le resume de reservation */}
         {tripInfo && (
           <TripMap
             pickupCoords={tripInfo.pickup_coords}
             dropoffCoords={tripInfo.dropoff_coords}
             distanceKm={tripInfo.distance_km}
             durationMin={tripInfo.duration_min}
+            geometry={tripInfo.geometry}
           />
         )}
         <div ref={messagesEndRef} />

@@ -33,6 +33,7 @@ body {
   color: #b5b5b5;
   font-size: 17px;
   line-height: 1.6;
+  justify-content: center;
 }
 
 /* ---------- Pilule flottante ---------- */
@@ -68,6 +69,7 @@ body {
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
+  font-family: "Segoe UI", sans-serif;
 }
 
 .launcher-question {
@@ -96,6 +98,7 @@ body {
   overflow: hidden;
   box-shadow: 0 12px 45px rgba(0, 0, 0, 0.45);
   z-index: 999;
+  font-family: "Segoe UI", sans-serif;
 }
 
 .chatbot-header {
@@ -180,4 +183,112 @@ body {
   color: #ffffff;
   cursor: pointer;
   font-size: 14px;
+}
+.trip-card{
+
+    width:100%;
+
+    background:#fff;
+
+    border-radius:24px;
+
+    overflow:hidden;
+
+    box-shadow:
+        0 15px 40px rgba(0,0,0,.12);
+
+    margin-top:15px;
+
+    animation:fadeIn .35s ease;
+
+}
+
+.trip-map{
+
+    width:100%;
+
+    height:240px;
+
+}
+
+.trip-footer{
+
+    display:flex;
+
+    justify-content:space-around;
+
+    align-items:center;
+
+    padding:18px;
+
+    background:white;
+
+}
+
+.trip-item{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+}
+
+.trip-item svg{
+
+    color:#007AFF;
+
+}
+
+.trip-item span{
+
+    display:block;
+
+    font-size:12px;
+
+    color:#888;
+
+}
+
+.trip-item strong{
+
+    font-size:18px;
+
+    color:#111;
+
+}
+
+.leaflet-container{
+
+    border-radius:24px 24px 0 0;
+
+}
+
+.leaflet-popup-content{
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+@keyframes fadeIn{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(15px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:none;
+
+    }
+
 }

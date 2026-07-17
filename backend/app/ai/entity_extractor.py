@@ -8,6 +8,7 @@ Combine 3 approches :
 
 import json
 import re
+from difflib import get_close_matches
 from pathlib import Path
 
 import spacy
@@ -50,6 +51,19 @@ for category, items in GAZETTEER.items():
             CANONICAL[term.lower()] = (label, item["name"], category)
         patterns = [nlp.make_doc(t) for t in terms]
         matcher.add(f"{label}::{item['name']}", patterns)
+
+def resolve_location(text: str) -> str:
+    """Corrige les petites fautes de frappe dans un nom de lieu en le comparant
+    au gazetteer (ex: 'Orlando interntional airport' -> 'Orlando International Airport').
+    Retourne le texte original si aucune correspondance suffisamment proche n'est trouvee."""
+    key = text.strip().lower()
+    if key in CANONICAL:
+        return CANONICAL[key][1]
+    match = get_close_matches(key, CANONICAL.keys(), n=1, cutoff=0.82)
+    if match and CANONICAL[match[0]][0] == "LOCATION":
+        return CANONICAL[match[0]][1]
+    return text
+
 
 # règles regex
 WORD_NUMBERS = {

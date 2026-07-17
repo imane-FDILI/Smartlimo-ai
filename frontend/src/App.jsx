@@ -11,9 +11,7 @@ function App() {
       <div className="intro">
         <h1 className="title"> SmartLimo AI</h1>
         <p className="subtitle">
-          Assistant conversationnel intelligent : réservez votre limousine,
-          obtenez une estimation de prix et suivez votre chauffeur simplement
-          en discutant.
+          Intelligent conversational assistant for booking your limousine,<b>getting instant fare estimates,</b>  and tracking your chauffeur through natural conversation.
         </p>
       </div>
 
@@ -24,8 +22,8 @@ function App() {
       >
         <img src="/launcher-van.png" alt="SmartLimo" className="launcher-van" />
         <div className="launcher-text">
-          <span className="launcher-question">Ask SmartLimo</span>
-          <span className="launcher-cta">Get Instant Quote</span>
+          <span className="launcher-question"><strong>Ask SmartLimo</strong></span>
+          <span className="launcher-cta"><strong>Get Instant Quote</strong></span>
         </div>
       </button>
 

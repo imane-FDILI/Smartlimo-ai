@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, Date, Time, ForeignKey, DateTime
 from sqlalchemy.sql import func
+from datetime import datetime
 from app.database import Base
+from sqlalchemy.orm import relationship
 
 
 class User(Base):
@@ -48,6 +50,7 @@ class Reservation(Base):
     passengers = Column(Integer, default=1)
     luggage = Column(Integer, default=0)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
+    vehicle = relationship("Vehicle")
     status = Column(String, default="pending")      # pending / confirmed / completed / cancelled
     price = Column(Float)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
