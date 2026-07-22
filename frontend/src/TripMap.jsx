@@ -1,105 +1,57 @@
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-  Popup,
-} from "react-leaflet";
-
-import "leaflet/dist/leaflet.css";
-
+// TripMap.jsx - carte du trajet style "Apple Plans"
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";   // VITAL : sans ce CSS, les tuiles sont invisibles !
 import L from "leaflet";
-//import { MapPin, Navigation } from "lucide-react";
-import "./App.css";
 
-delete L.Icon.Default.prototype._getIconUrl;
+// Pastilles colorees facon Apple (vert = depart, rouge = arrivee)
+const dotIcon = (color) =>
+  L.divIcon({
+    className: "",
+    html: `<div style="width:16px;height:16px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
 
-L.Icon.Default.mergeOptions({
-  iconUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
-
-function TripMap({
-  pickupCoords,
-  dropoffCoords,
-  distanceKm,
-  durationMin,
-  geometry,
-}) {
-
-  const center = [
-    (pickupCoords[0] + dropoffCoords[0]) / 2,
-    (pickupCoords[1] + dropoffCoords[1]) / 2,
-  ];
-
+function TripMap({ pickupCoords, dropoffCoords, distanceKm, durationMin, geometry }) {
   return (
-
-    <div className="trip-card">
-
+    <div className="trip-map">
       <MapContainer
-        center={center}
-        zoom={11}
+        bounds={[pickupCoords, dropoffCoords]}
+        boundsOptions={{ padding: [30, 30] }}
+        style={{ height: "220px", width: "100%" }}
         scrollWheelZoom={false}
-        className="trip-map"
       >
-
+        {/* Tuiles CartoDB Voyager : le style pastel epure proche d'Apple Plans */}
         <TileLayer
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution="© OpenStreetMap"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap &copy; CARTO'
         />
 
-        <Marker position={pickupCoords}>
+        <Marker position={pickupCoords} icon={dotIcon("#34C759")}>
           <Popup>Pickup</Popup>
         </Marker>
-
-        <Marker position={dropoffCoords}>
+        <Marker position={dropoffCoords} icon={dotIcon("#FF3B30")}>
           <Popup>Destination</Popup>
         </Marker>
 
+        {/* Le trajet : dore SmartLimo, epais, bouts arrondis */}
         <Polyline
-          positions={geometry || [pickupCoords, dropoffCoords]}
-          color="#007AFF"
-          weight={6}
+          positions={geometry && geometry.length > 1 ? geometry : [pickupCoords, dropoffCoords]}
+          color="#c9a227"
+          weight={5}
+          opacity={0.9}
+          lineCap="round"
+          lineJoin="round"
         />
-
       </MapContainer>
 
-      <div className="trip-footer">
-
-        <div className="trip-item">
-
-          <div>
-
-            <span>Distance</span>
-
-            <strong>{distanceKm} km</strong>
-
-          </div>
-
-        </div>
-
-        <div className="trip-item">
-
-          <div>
-
-            <span>Estimated</span>
-
-            <strong>{durationMin} min</strong>
-
-          </div>
-
-        </div>
-
+      <div className="trip-info">
+        <span>📍 {distanceKm} km</span>
+        <span className="trip-sep">•</span>
+        <span>🕐 ~{durationMin} min</span>
       </div>
-
     </div>
-
   );
-
 }
 
 export default TripMap;

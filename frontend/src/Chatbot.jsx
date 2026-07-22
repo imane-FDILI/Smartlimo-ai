@@ -16,16 +16,18 @@ function Chatbot({ onClose }) {
   // Données du trajet (coordonnées, distance, geometry) une fois le resume de reservation détecté
   const [tripInfo, setTripInfo] = useState(null);
   const messagesEndRef = useRef(null);
+  const [showVehicleButtons, setShowVehicleButtons] = useState(false);
 
   // Auto-scroll vers le dernier message à chaque nouveau message ou changement de statut de chargement
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (textOverride) => {
+    const textToSend = textOverride ?? input;
+    if (!textToSend.trim() || isLoading) return;
 
-    const userMessage = { sender: "user", text: input };
+    const userMessage = { sender: "user", text: textToSend };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
@@ -55,6 +57,7 @@ function Chatbot({ onClose }) {
           });
         }
       }
+    setShowVehicleButtons(data.reply.includes("What type of vehicle would you prefer"));
     } catch (error) {
       console.log(error);
       console.log(error.response);
@@ -72,6 +75,11 @@ function Chatbot({ onClose }) {
   // Envoi du message avec la touche Entrée
   const handleKeyDown = (e) => {
     if (e.key === "Enter") sendMessage();
+  };
+  
+  const handleVehicleClick = (vehicle) => {
+    setShowVehicleButtons(false);
+    sendMessage(vehicle);
   };
 
   return (
@@ -98,8 +106,19 @@ function Chatbot({ onClose }) {
             geometry={tripInfo.geometry}
           />
         )}
+        
+        {showVehicleButtons && (
+          <div className="vehicle-buttons">
+            {["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN", "No Preference"].map((v) => (
+              <button key={v} className="vehicle-btn" onClick={() => handleVehicleClick(v)}>
+                {v}
+              </button>
+            ))}
+          </div>
+        )}  
         <div ref={messagesEndRef} />
       </div>
+    
 
       <div className="chatbot-input">
         <input
@@ -109,7 +128,7 @@ function Chatbot({ onClose }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
         />
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={() => sendMessage()}>Send</button>
       </div>
     </div>
   );

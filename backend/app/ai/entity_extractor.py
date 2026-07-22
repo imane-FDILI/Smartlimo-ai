@@ -122,7 +122,7 @@ def extract_entities(text: str) -> dict:
         label, canonical, category = CANONICAL[span.text.lower()]
         if label == "LOCATION":
             locations.append((span, canonical, category))
-        elif label == "VEHICLE" and not slots["vehicle"]:
+        elif label == "" and not slots["vehicle"]:
             slots["vehicle"] = canonical
         elif label == "SERVICE" and not slots["service_type"]:
             slots["service_type"] = canonical

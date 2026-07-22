@@ -39,9 +39,11 @@ def create_reservation(db: Session, slots: dict) -> Reservation:
         email=slots.get("email", ""),
         phone=slots.get("phone", ""),
     )
+    vehicle = db.query(Vehicle).filter(Vehicle.name == slots.get("vehicle")).first()
 
     reservation = Reservation(
         user_id=user.id,
+        vehicle_id=vehicle.id if vehicle else None,
         service_type=slots.get("service_type") or "point_to_point",
         pickup_location=slots.get("pickup_location", ""),
         dropoff_location=slots.get("dropoff_location", ""),

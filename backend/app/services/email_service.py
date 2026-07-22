@@ -23,7 +23,7 @@ Reservation details:
 - Destination: {reservation.dropoff_location}
 - Date: {reservation.pickup_date}
 - Time: {reservation.pickup_time}
-- Vehicle: {vehicle_name}
+- Vehicle: {reservation.vehicle.name if reservation.vehicle else "To be assigned"}
 {price_line}
 Thank you for choosing SmartLimo!
 
