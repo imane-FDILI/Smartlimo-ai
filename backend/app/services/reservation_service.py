@@ -13,10 +13,34 @@ from datetime import datetime, timedelta, date, time
 import dateparser
 from sqlalchemy.orm import Session
 
-from app.models import User, Reservation, Vehicle, Zone, Rate, ZoneZipcode
+from app.models import User, Reservation, Vehicle, Zone, Rate, ZoneZipcode, Surcharge
 from app.services.geo_service import get_route
 from app.services.pricing_service import get_fixed_rate
+import datetime as dt
 
+US_HOLIDAYS_2026 = [
+    dt.date(2026, 1, 1),   # New Year
+    dt.date(2026, 7, 4),   # Independence Day
+    dt.date(2026, 12, 25), # Christmas
+    # liste non exhaustive - a completer si besoin
+]
+
+
+def apply_surcharges(db: Session, base_price: float, pickup_time, pickup_date) -> float:
+    """Applique les suppléments simples (nuit, jour férié) au prix de base."""
+    total = base_price
+
+    early_late = db.query(Surcharge).filter(Surcharge.code == "EARLY_LATE").first()
+    if early_late and pickup_time is not None:
+        if pickup_time.hour < 5 or pickup_time.hour >= 0 and pickup_time.hour < 5:
+            if 0 <= pickup_time.hour < 5:
+                total += early_late.amount
+
+    holiday = db.query(Surcharge).filter(Surcharge.code == "HOLIDAY_SURCHARGE").first()
+    if holiday and pickup_date is not None and pickup_date in US_HOLIDAYS_2026:
+        total += total * (holiday.percent / 100)
+
+    return round(total, 2)
 
 def get_or_create_user(db: Session, name: str, email: str, phone: str) -> User:
     """Retrouve un utilisateur existant par son email, ou en crée un

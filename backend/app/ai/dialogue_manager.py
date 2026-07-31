@@ -217,42 +217,30 @@ def _lookup_history(email: str) -> str:
 
 def _compute_price(slots: dict):
     from app.database import SessionLocal
-    from app.services.geo_service import get_route
-    from app.services.reservation_service import estimate_price
-    route = get_route(slots.get("pickup_location", ""), slots.get("dropoff_location", ""))
-    if route is None:
-        return
+    from app.services.reservation_service import estimate_price_by_zone
     db = SessionLocal()
     try:
-        slots["estimated_price"] = estimate_price(
-            db, route["distance_km"], slots.get("vehicle"),
-            pickup_location=slots.get("pickup_location"),
-            dropoff_location=slots.get("dropoff_location"),
-        )
+        price = estimate_price_by_zone(db, slots.get("pickup_location", ""), slots.get("dropoff_location", ""), slots.get("vehicle"))
+        if price is not None:
+            slots["estimated_price"] = price
     finally:
         db.close()
 
 
 def _price_quote(pickup: str, dropoff: str, vehicle: str) -> str:
-    from app.services.geo_service import get_route
     from app.database import SessionLocal
-    from app.services.reservation_service import estimate_price
-
-    route = get_route(pickup, dropoff)
-    if route is None:
-        return "Sorry, I couldn't find one of these locations. Could you try again?"
+    from app.services.reservation_service import estimate_price_by_zone
 
     db = SessionLocal()
     try:
-        price = estimate_price(
-            db, route["distance_km"], vehicle,
-            pickup_location=pickup, dropoff_location=dropoff,
-        )
+        price = estimate_price_by_zone(db, pickup, dropoff, vehicle)
     finally:
         db.close()
 
-    return (f"A {vehicle} from {pickup} to {dropoff} would cost approximately "
-            f"${price} ({route['distance_km']} km, ~{route['duration_min']} min).")
+    if price is None:
+        return "Sorry, I don't have a fixed rate for this route. Please contact us for a custom quote."
+
+    return f"A {vehicle} from {pickup} to {dropoff} would cost ${price}."
 
 
 def _vehicle_info() -> str:
