@@ -116,6 +116,11 @@ uploads/
 media/
 
 # ======================
+# Fichiers de donnees metier (grille de tarifs)
+# ======================
+backend/data/pricing/*.xlsx
+
+# ======================
 # Secrets
 # ======================
 *.pem

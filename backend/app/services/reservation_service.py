@@ -1,24 +1,44 @@
+"""
+SmartLimo AI - Service des réservations
+
+Contient toute la logique métier liée aux réservations : création,
+annulation, modification, recherche par client, calcul de prix et
+recommandation de véhicule. C'est le service le plus utilisé par
+dialogue_manager.py, qui l'appelle à chaque étape clé de la conversation
+(confirmation, annulation, devis, etc.).
+"""
+
 from datetime import datetime, timedelta, date, time
 
 import dateparser
 from sqlalchemy.orm import Session
 
-from app.models import User, Reservation, Vehicle
+from app.models import User, Reservation, Vehicle, Zone, Rate, ZoneZipcode
 from app.services.geo_service import get_route
+from app.services.pricing_service import get_fixed_rate
 
 
 def get_or_create_user(db: Session, name: str, email: str, phone: str) -> User:
+    """Retrouve un utilisateur existant par son email, ou en crée un
+    nouveau si aucun ne correspond. L'email sert donc de clé d'identité
+    du client (voir aussi le champ `unique` sur User.email dans models.py)."""
     user = db.query(User).filter(User.email == email).first()
     if user:
         return user
     user = User(name=name, email=email, phone=phone)
     db.add(user)
     db.commit()
-    db.refresh(user)
+    db.refresh(user)  # recharge l'objet depuis la base pour récupérer son id généré
     return user
 
 
 def parse_date(raw: str) -> date:
+    """Convertit une date écrite en langage naturel (ex: "tomorrow",
+    "next Friday", "22 July") en objet `date` Python, grâce à la librairie
+    `dateparser`. PREFER_DATES_FROM="future" évite qu'une date comme
+    "Friday" soit interprétée comme un vendredi déjà passé.
+    Si le texte n'est pas compris, on retombe sur "demain" par défaut
+    plutôt que d'échouer (une réservation a besoin d'une date valide)."""
     parsed = dateparser.parse(raw, settings={"PREFER_DATES_FROM": "future"})
     if parsed:
         return parsed.date()
@@ -26,6 +46,9 @@ def parse_date(raw: str) -> date:
 
 
 def parse_time(raw: str) -> time:
+    """Convertit une heure en langage naturel (ex: "2pm", "14:30") en
+    objet `time` Python. Retombe sur midi (12:00) par défaut si le texte
+    n'est pas reconnu."""
     parsed = dateparser.parse(raw)
     if parsed:
         return parsed.time()
@@ -33,12 +56,20 @@ def parse_time(raw: str) -> time:
 
 
 def create_reservation(db: Session, slots: dict) -> Reservation:
+    """Crée la réservation en base à partir des slots collectés par le
+    dialogue manager. Récupère (ou crée) d'abord le client, puis résout
+    le nom de véhicule choisi en son id réel, avant d'insérer la ligne
+    Reservation avec le statut "confirmed" (la confirmation utilisateur a
+    déjà eu lieu à ce stade du dialogue)."""
     user = get_or_create_user(
         db,
         name=slots.get("name", ""),
         email=slots.get("email", ""),
         phone=slots.get("phone", ""),
     )
+    # Recherche du véhicule par son nom (ex: "Sedan") pour récupérer son id ;
+    # si le nom ne correspond à aucun véhicule (ex: "No Preference"),
+    # vehicle_id restera None.
     vehicle = db.query(Vehicle).filter(Vehicle.name == slots.get("vehicle")).first()
 
     reservation = Reservation(
@@ -50,18 +81,24 @@ def create_reservation(db: Session, slots: dict) -> Reservation:
         pickup_date=parse_date(str(slots.get("date", ""))),
         pickup_time=parse_time(str(slots.get("time", ""))),
         passengers=slots.get("passengers") or 1,
+        # Contrairement à `or 1` ci-dessus pour passengers, on vérifie
+        # explicitement `is not None` pour luggage car 0 est une valeur
+        # valide qui ne doit pas être remplacée par une valeur par défaut.
         luggage=slots.get("luggage") if slots.get("luggage") is not None else 0,
         status="confirmed",
         price=slots.get("estimated_price"),
     )
     db.add(reservation)
     db.commit()
-    db.refresh(reservation)
+    db.refresh(reservation)  # récupère l'id généré et les valeurs par défaut serveur
     return reservation
 
 
 
 def cancel_reservation(db: Session, reservation_id: int) -> bool:
+    """Passe le statut d'une réservation à "cancelled". Ne supprime jamais
+    la ligne en base (conservation de l'historique), retourne False si la
+    réservation n'existe pas."""
     reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
     if reservation:
         reservation.status = "cancelled"
@@ -71,10 +108,16 @@ def cancel_reservation(db: Session, reservation_id: int) -> bool:
 
 
 def get_user_reservations(db, email):
+    """Retourne toutes les réservations actives (non annulées) associées à
+    l'email fourni (liste vide si l'email est inconnu ou si l'utilisateur
+    n'a aucune réservation)."""
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         return []
-    return db.query(Reservation).filter(Reservation.user_id == user.id).all()
+    return db.query(Reservation).filter(
+        Reservation.user_id == user.id,
+        Reservation.status != "cancelled"
+    ).all()
 
 def get_reservation_route(db: Session, reservation_id: int):
     # Retourne le trajet (distance/duree/coordonnees) de la reservation via geo_service,
@@ -114,12 +157,112 @@ def update_reservation(db: Session, reservation_id: int, field: str, value) -> b
     return True
 
 def recommend_vehicle(db: Session, passengers: int, luggage: int = 0):
+    """Recommande le véhicule le plus adapté : le plus petit (par
+    capacité croissante) qui peut accueillir à la fois le nombre de
+    passagers et de bagages demandés. C'est cette fonction (et non celle
+    de services/recommendation_service.py ni le modèle entraîné par
+    train_recommender.py) qui est réellement utilisée par le chatbot.
+    Ne filtre pas sur le statut "available" du véhicule (contrairement à
+    recommendation_service.recommend_vehicle) : retourne le premier type
+    de véhicule suffisant, indépendamment de sa disponibilité réelle."""
     return db.query(Vehicle).filter(
         Vehicle.capacity >= passengers,
         Vehicle.luggage >= luggage
     ).order_by(Vehicle.capacity).first()
 
-def estimate_price(db: Session, distance_km: float, vehicle_name: str = None) -> float:
+def estimate_price(db: Session, distance_km: float, vehicle_name: str = None,
+                    pickup_location: str = None, dropoff_location: str = None) -> float:
+    """Calcule le prix estimé d'une course. Priorité à la grille de
+    tarifs fixes (voir pricing_service.get_fixed_rate) si le trajet
+    (pickup/dropoff) et le véhicule y sont couverts. Sinon, calcul par
+    distance (comportement historique, conservé en repli) : un forfait de
+    base (10.0) + un tarif au kilomètre dépendant du véhicule choisi. Si
+    le véhicule n'est pas reconnu (ex: "No Preference" ou nom invalide),
+    on applique un tarif par défaut de 3.0/km plutôt que d'échouer."""
+    fixed_rate = get_fixed_rate(db, pickup_location, dropoff_location, vehicle_name)
+    if fixed_rate is not None:
+        return fixed_rate
+
     vehicle = db.query(Vehicle).filter(Vehicle.name == vehicle_name).first()
     ppk = vehicle.price_per_km if vehicle else 3.0
     return round(10.0 + distance_km * ppk, 2)
+
+VEHICLE_NAME_TO_RATE_CODE = {
+    "Sedan": "SEDAN",
+    "Executive SUV": "SUV",
+    "Transit VAN": "VAN",
+    "Sprinter VAN": "SPRINTER VAN",
+    "Premium SUV": "LIMOUSINE",
+}
+
+PICKUP_KEYWORDS = {
+    "MCO": ["mco", "orlando international airport"],
+    "SFB": ["sanford", "sfb"],
+    "PORT": ["port canaveral", "port", "cruise"],
+}
+
+
+def resolve_pickup_zone_code(pickup_text: str) -> str | None:
+    """Reconnait l'origine (MCO/SFB/PORT) par mot-cle simple dans le texte."""
+    text = pickup_text.lower()
+    for zone_code, keywords in PICKUP_KEYWORDS.items():
+        for kw in keywords:
+            if kw in text:
+                return zone_code
+    return None
+
+
+DROPOFF_KEYWORDS = {
+    "DISNEY": ["disney", "lake buena vista"],
+    "UNIVERSAL": ["universal"],
+    "KISSIMMEE": ["kissimmee", "celebration"],
+    "DAVENPORT": ["davenport", "champions gate"],
+    "LEGOLAND": ["legoland", "lego land"],
+    "PORT": ["port canaveral", "cocoa beach"],
+}
+
+
+def resolve_dropoff_zone_code(db: Session, dropoff_text: str) -> str | None:
+    """Reconnait la zone de destination par mot-cle dans le texte du client."""
+    text = dropoff_text.lower()
+    for zone_code, keywords in DROPOFF_KEYWORDS.items():
+        for kw in keywords:
+            if kw in text:
+                return zone_code
+    return None
+
+
+def estimate_price_by_zone(db: Session, pickup: str, dropoff: str, vehicle_name: str) -> float | None:
+    """Calcule le prix en cherchant un tarif fixe dans la grille zone-a-zone."""
+    zone_from_code = resolve_pickup_zone_code(pickup)
+    if zone_from_code is None:
+        return None
+
+    zone_to_code = resolve_dropoff_zone_code(db, dropoff)
+    if zone_to_code is None:
+        return None
+
+    rate_code = VEHICLE_NAME_TO_RATE_CODE.get(vehicle_name)
+    if rate_code is None:
+        return None
+
+    zone_from = db.query(Zone).filter(Zone.code == zone_from_code).first()
+    zone_to = db.query(Zone).filter(Zone.code == zone_to_code).first()
+    if not zone_from or not zone_to:
+        return None
+
+    rate = db.query(Rate).filter(
+        Rate.vehicle_code == rate_code,
+        Rate.zone_from_id == zone_from.id,
+        Rate.zone_to_id == zone_to.id,
+    ).first()
+
+    if rate is None:
+        return None
+
+    total = rate.rate
+    if rate.tolls:
+        total += rate.tolls
+    if rate.parking:
+        total += rate.parking
+    return round(total, 2)

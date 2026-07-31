@@ -5,10 +5,22 @@ Built from the analysis of 3 real limousine websites (MLS, Orlando Magical
 Rides, Example Limousine) and their reservation forms.
 Service types (From Airport, To Airport, Point-to-Point, Hourly, From Port,
 To Port) are treated as SLOTS of book_ride, not separate intents.
+
+Ce script ne fait qu'écrire des données statiques dans un fichier CSV
+(datasets/intents.csv) : il n'y a aucune logique complexe, juste un gros
+dictionnaire d'exemples de phrases classées par intention (DATA), puis
+une boucle qui les sérialise au format CSV attendu par train_intents.py
+(colonnes "text" et "intent"). Ce fichier CSV est ensuite utilisé pour
+entraîner intent_classifier via train_intents.py.
 """
 
 import csv
 
+# Dictionnaire {nom_de_l_intention: [liste de phrases d'exemple en anglais]}.
+# Chaque intention doit avoir suffisamment d'exemples variés (formulations,
+# fautes de frappe volontaires, styles familiers) pour que le modèle TF-IDF
+# + régression logistique (voir train_intents.py) généralise bien à de
+# nouvelles phrases jamais vues à l'entraînement.
 DATA = {
     "greeting": [
         "Hi", "Hello", "Hey", "Good morning", "Good afternoon", "Good evening",
@@ -514,13 +526,20 @@ DATA = {
     ],
 }
 
+# Écriture du CSV : une ligne par phrase, avec son intention associée.
+# newline="" est requis par le module csv sous Windows pour éviter des
+# retours à la ligne dupliqués/mal formés dans le fichier généré.
 with open("intents.csv", "w", newline="", encoding="utf-8") as f:
     writer = csv.writer(f)
-    writer.writerow(["text", "intent"])
+    writer.writerow(["text", "intent"])  # en-tête des colonnes
     for intent, sentences in DATA.items():
         for s in sentences:
             writer.writerow([s, intent])
 
+# Petit récapitulatif affiché après génération, pour vérifier rapidement
+# que le nombre d'exemples par intention est raisonnablement équilibré
+# (un déséquilibre trop important pourrait biaiser le modèle vers les
+# intentions les plus représentées).
 total = sum(len(v) for v in DATA.values())
 print(f"Dataset generated: {total} sentences, {len(DATA)} intents")
 for intent, sentences in DATA.items():

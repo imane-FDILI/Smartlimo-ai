@@ -238,3 +238,28 @@ body {
 .trip-sep {
   color: #c9a227;
 }
+.confirm-buttons {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.confirm-btn-yes {
+  background: #c9a227;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirm-btn-no {
+  background: transparent;
+  border: 1.5px solid #666;
+  color: #666;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}

@@ -1,3 +1,25 @@
+"""
+SmartLimo AI - Gestionnaire de dialogue (dialogue manager)
+
+Ce module est le "cerveau" du chatbot : il reçoit un message utilisateur,
+détecte son intention (via intent_classifier) et les entités qu'il contient
+(via entity_extractor), puis décide de la réponse à donner en fonction de
+l'état de la conversation (session).
+
+La conversation est modélisée comme une petite machine à états :
+  - "idle"       : aucune réservation en cours
+  - "collecting" : on est en train de collecter les informations (slots)
+                   nécessaires à la réservation (lieu, date, véhicule...)
+  - "confirming" : tous les slots sont remplis, on attend la confirmation
+                   finale de l'utilisateur avant de créer la réservation
+  - "completed"  : la réservation a été créée
+
+En plus de ce flux principal de réservation, le module gère aussi des
+sous-dialogues plus courts (demande de prix, historique des trajets,
+modification/annulation de réservation, etc.) via le champ `expected`
+qui indique quelle information précise on attend dans le prochain message.
+"""
+
 import re
 import uuid
 
@@ -32,6 +54,23 @@ NUM_RE = re.compile(r"\d+")
 NO_PREF_RE = re.compile(r"no preference|any|whatever|doesn'?t matter", re.I)
 ACCEPT_RECO_RE = re.compile(r"\b(yes|sure|ok|okay|sounds good|your recommendation|that one|the one you suggested|agree)\b", re.I)
 NONE_RE = re.compile(r"\b(none|no|zero|nothing)\b", re.I)
+RESERVATION_NUM_RE = re.compile(r"#?(\d+)")
+
+# Mots-clés reconnus pour identifier quel slot l'utilisateur veut modifier
+# après avoir refusé (deny) le résumé de réservation (voir "edit_field"
+# dans handle_message). Recherche par mot entier (\b), premier match gagne.
+EDIT_FIELD_KEYWORDS = {
+    "pickup_location": ["pickup", "pick up", "pick-up"],
+    "dropoff_location": ["destination", "dropoff", "drop off", "drop-off"],
+    "date": ["date"],
+    "time": ["time"],
+    "passengers": ["passenger", "passengers"],
+    "luggage": ["luggage", "bag", "bags"],
+    "vehicle": ["vehicle", "car"],
+    "name": ["name"],
+    "phone": ["phone", "number"],
+    "email": ["email"],
+}
 
 INTENT_RESPONSES = {
     "greeting": "Hello! Welcome to SmartLimo AI. I can help you book a limousine, get a price estimate, or track your driver. How can I help you today?",
@@ -148,6 +187,7 @@ def _summary(slots: dict) -> str:
     lines += ["", "Would you like to confirm your reservation?"]
     return "\n".join(lines)
 
+
 def _acknowledge(captured: list, slots: dict) -> str:
     if len(captured) < 2:
         return ""
@@ -174,6 +214,7 @@ def _lookup_history(email: str) -> str:
         db.close()
     return _format_history(reservations)
 
+
 def _compute_price(slots: dict):
     from app.database import SessionLocal
     from app.services.geo_service import get_route
@@ -183,9 +224,14 @@ def _compute_price(slots: dict):
         return
     db = SessionLocal()
     try:
-        slots["estimated_price"] = estimate_price(db, route["distance_km"], slots.get("vehicle"))
+        slots["estimated_price"] = estimate_price(
+            db, route["distance_km"], slots.get("vehicle"),
+            pickup_location=slots.get("pickup_location"),
+            dropoff_location=slots.get("dropoff_location"),
+        )
     finally:
         db.close()
+
 
 def _price_quote(pickup: str, dropoff: str, vehicle: str) -> str:
     from app.services.geo_service import get_route
@@ -198,12 +244,16 @@ def _price_quote(pickup: str, dropoff: str, vehicle: str) -> str:
 
     db = SessionLocal()
     try:
-        price = estimate_price(db, route["distance_km"], vehicle)
+        price = estimate_price(
+            db, route["distance_km"], vehicle,
+            pickup_location=pickup, dropoff_location=dropoff,
+        )
     finally:
         db.close()
 
     return (f"A {vehicle} from {pickup} to {dropoff} would cost approximately "
             f"${price} ({route['distance_km']} km, ~{route['duration_min']} min).")
+
 
 def _vehicle_info() -> str:
     from app.database import SessionLocal
@@ -220,6 +270,7 @@ def _vehicle_info() -> str:
     lines.append("Which one would you like to know more about, or are you ready to book?")
     return "\n".join(lines)
 
+
 def _vehicle_prefix(slots: dict) -> str:
     from app.database import SessionLocal
     from app.services.reservation_service import recommend_vehicle
@@ -233,13 +284,8 @@ def _vehicle_prefix(slots: dict) -> str:
         return f"Based on {slots.get('passengers')} passenger(s) and {slots.get('luggage')} bag(s), I recommend the {v.name}.\n"
     return ""
 
-def _apply_modification(session: dict, entities: dict) -> str | None:
-    # Regarde ce que l'extracteur a capte dans le message et modifie
-    # la reservation en consequence. Retourne le texte de confirmation,
-    # ou None si rien d'exploitable n'a ete capte.
 
-    # Table de correspondance : entite captee -> colonne de la base
-    # Chaque tuple : (cle dans entities, nom de la colonne, besoin de conversion)
+def _apply_modification(session: dict, entities: dict) -> str | None:
     FIELD_MAP = [
         ("time", "pickup_time", "time"),
         ("date", "pickup_date", "date"),
@@ -249,17 +295,14 @@ def _apply_modification(session: dict, entities: dict) -> str | None:
         ("luggage", "luggage", None),
     ]
 
-    # les imports sont ici (imports "locaux") pour eviter un import circulaire :
-    # reservation_service et dialogue_manager ne doivent pas s'importer en boucle
     from app.database import SessionLocal
     from app.services.reservation_service import update_reservation, parse_date, parse_time
 
     for entity_key, column_name, conversion in FIELD_MAP:
-        value = entities.get(entity_key)          # .get() renvoie None si absent
+        value = entities.get(entity_key)
         if value is None:
-            continue                              # rien capte pour cette entite -> suivante
+            continue
 
-        # conversion du texte libre ("5pm", "tomorrow") vers un vrai type SQL
         if conversion == "time":
             value = parse_time(str(value))
         elif conversion == "date":
@@ -269,17 +312,14 @@ def _apply_modification(session: dict, entities: dict) -> str | None:
         try:
             ok = update_reservation(db, session["reservation_id"], column_name, value)
         finally:
-            db.close()                            # toujours rendre la connexion
+            db.close()
 
         if ok:
-            # f-string : les {} inserent les valeurs des variables dans le texte
             return f"Done! Your {column_name.replace('_', ' ')} has been updated to {value}."
         return "Sorry, I couldn't find that reservation."
 
-    # la boucle s'est terminee sans rien capter -> None (l'appelant demandera des precisions)
     return None
 
-    
 
 def handle_message(conversation_id: str | None, message: str) -> dict:
     if not conversation_id or conversation_id not in SESSIONS:
@@ -338,12 +378,35 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
                 session["slots"]["dropoff_location"],
                 found
             ))
-        # Aucun vehicule detecte -> on libere le contexte et on traite normalement
         session["expected"] = None
         if intent in ("thanks", "goodbye"):
             reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])
             return _reply(conversation_id, reply)
         return _reply(conversation_id, "Which vehicle would you like the price for? Or type 'book' to start a reservation.")
+
+    if session.get("expected") == "edit_field":
+        text = message.lower()
+        matched_key = None
+        for key, keywords in EDIT_FIELD_KEYWORDS.items():
+            if any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in keywords):
+                matched_key = key
+                break
+
+        if not matched_key:
+            return _reply(conversation_id,
+                "Sorry, which field would you like to change? (pickup, destination, date, time, "
+                "passengers, luggage, vehicle, name, phone, or email)")
+
+        # On vide le slot ciblé (et le prix, s'il dépend du trajet) puis on
+        # redemande sa valeur : le prochain message retombera dans le flux
+        # "collecting" normal (_merge_entities / _fill_expected), qui SAIT
+        # remplir un slot vide - contrairement à un slot déjà rempli.
+        session["slots"][matched_key] = None
+        if matched_key in ("pickup_location", "dropoff_location"):
+            session["slots"]["estimated_price"] = None
+        session["expected"] = matched_key
+        session["stage"] = "collecting"
+        return _reply(conversation_id, dict(REQUIRED_SLOTS)[matched_key])
 
     if session.get("expected") == "modify_detail" and session.get("reservation_id"):
         session["expected"] = None
@@ -352,6 +415,9 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             return _reply(conversation_id, confirmation)
         return _reply(conversation_id, "I didn't catch what to change. Try: 'change my pickup time to 5pm'.")
 
+    # =====================================================================
+    # Flux principal de réservation : collecte des slots puis confirmation
+    # =====================================================================
     if session["stage"] in ("collecting", "confirming"):
 
         if intent == "cancel_booking":
@@ -388,6 +454,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
                     f"Thank you for choosing SmartLimo!")
             if intent == "deny":
                 session["stage"] = "collecting"
+                session["expected"] = "edit_field"
                 return _reply(conversation_id, "No problem! What would you like to change?")
             if intent in ("pricing", "payment", "vehicle_information", "help",
                           "driver_tracking", "trip_history", "tip"):
@@ -409,21 +476,78 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         session["stage"] = "confirming"
         return _reply(conversation_id, _summary(session["slots"]))
 
-    if intent == "cancel_booking" and session.get("reservation_id"):
+    # =====================================================================
+    # Hors flux de réservation : routage par intention
+    # =====================================================================
+
+    if intent == "cancel_booking":
+        num_match = RESERVATION_NUM_RE.search(message)
+        target_reservation_id = None
+
+        if num_match:
+            candidate_id = int(num_match.group(1))
+            email = session["slots"].get("email")
+            if email:
+                from app.database import SessionLocal
+                from app.models import Reservation, User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.email == email).first()
+                    if user:
+                        res = db.query(Reservation).filter(
+                            Reservation.id == candidate_id,
+                            Reservation.user_id == user.id
+                        ).first()
+                        if res:
+                            target_reservation_id = candidate_id
+                finally:
+                    db.close()
+
+        reservation_id = target_reservation_id or session.get("reservation_id")
+
+        if not reservation_id:
+            return _reply(conversation_id, "Could you give me your email so I can find that reservation?")
+
         from app.database import SessionLocal
         from app.services.reservation_service import cancel_reservation
         db = SessionLocal()
         try:
-            ok = cancel_reservation(db, session["reservation_id"])
+            ok = cancel_reservation(db, reservation_id)
         finally:
             db.close()
         if ok:
-            rid = session["reservation_id"]
-            SESSIONS[conversation_id] = _new_session()
-            return _reply(conversation_id, f"Your reservation #{rid} has been cancelled. We hope to see you again soon!")
+            return _reply(conversation_id, f"Your reservation #{reservation_id} has been cancelled. We hope to see you again soon!")
         return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
 
-    if intent == "modify_booking" and session.get("reservation_id"):
+    if intent == "modify_booking":
+        num_match = RESERVATION_NUM_RE.search(message)
+        target_reservation_id = None
+
+        if num_match:
+            candidate_id = int(num_match.group(1))
+            email = session["slots"].get("email")
+            if email:
+                from app.database import SessionLocal
+                from app.models import Reservation, User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.email == email).first()
+                    if user:
+                        res = db.query(Reservation).filter(
+                            Reservation.id == candidate_id,
+                            Reservation.user_id == user.id
+                        ).first()
+                        if res:
+                            target_reservation_id = candidate_id
+                finally:
+                    db.close()
+
+        reservation_id = target_reservation_id or session.get("reservation_id")
+
+        if not reservation_id:
+            return _reply(conversation_id, "I don't see an active reservation to modify. Would you like to book one, or check your past reservations?")
+
+        session["reservation_id"] = reservation_id
         confirmation = _apply_modification(session, entities)
         if confirmation:
             return _reply(conversation_id, confirmation)
@@ -453,12 +577,11 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
 
     if intent == "vehicle_information":
         return _reply(conversation_id, _vehicle_info())
-    
+
     if intent == "pricing":
         _merge_entities(session["slots"], entities)
         pickup = session["slots"].get("pickup_location")
         dropoff = session["slots"].get("dropoff_location")
-
 
         if not pickup or not dropoff:
             session["expected"] = "pricing_locations"
