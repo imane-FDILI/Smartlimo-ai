@@ -217,11 +217,15 @@ def _lookup_history(email: str) -> str:
 
 def _compute_price(slots: dict):
     from app.database import SessionLocal
-    from app.services.reservation_service import estimate_price_by_zone
+    from app.services.reservation_service import estimate_price_by_zone, apply_surcharges, parse_date, parse_time
+
     db = SessionLocal()
     try:
         price = estimate_price_by_zone(db, slots.get("pickup_location", ""), slots.get("dropoff_location", ""), slots.get("vehicle"))
         if price is not None:
+            pickup_time = parse_time(str(slots.get("time", "")))
+            pickup_date = parse_date(str(slots.get("date", "")))
+            price = apply_surcharges(db, price, pickup_time, pickup_date)
             slots["estimated_price"] = price
     finally:
         db.close()
