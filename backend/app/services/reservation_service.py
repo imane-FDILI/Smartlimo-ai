@@ -292,3 +292,30 @@ def estimate_price_by_zone(db: Session, pickup: str, dropoff: str, vehicle_name:
     if rate.parking:
         total += rate.parking
     return round(total, 2)
+
+def is_vehicle_available(db: Session, vehicle_name: str, pickup_date, pickup_time) -> bool:
+    """Verifie qu'aucune reservation active n'existe deja pour ce vehicule,
+    a une heure proche de celle demandee (fenetre de 2h par defaut)."""
+    vehicle = db.query(Vehicle).filter(Vehicle.name == vehicle_name).first()
+    if vehicle is None:
+        return True
+
+    requested_dt = datetime.combine(pickup_date, pickup_time)
+    window_start = (requested_dt - timedelta(hours=2)).time()
+    window_end = (requested_dt + timedelta(hours=2)).time()
+
+    existing = (
+        db.query(Reservation)
+        .filter(
+            Reservation.vehicle_id == vehicle.id,
+            Reservation.pickup_date == pickup_date,
+            Reservation.status.in_(["pending", "confirmed"]),
+        )
+        .all()
+    )
+
+    for res in existing:
+        if window_start <= res.pickup_time <= window_end:
+            return False
+
+    return True
