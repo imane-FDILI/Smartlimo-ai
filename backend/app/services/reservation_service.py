@@ -237,9 +237,9 @@ def resolve_pickup_zone_code(pickup_text: str) -> str | None:
 
 
 DROPOFF_KEYWORDS = {
-    "DISNEY": ["disney", "lake buena vista"],
+    "DISNEY - LAKE B VISTA": ["disney", "lake buena vista"],
     "UNIVERSAL": ["universal"],
-    "KISSIMMEE": ["kissimmee", "celebration"],
+    "KISSIMMEE - SOUTH AREA": ["kissimmee", "celebration"],
     "DAVENPORT": ["davenport", "champions gate"],
     "LEGOLAND": ["legoland", "lego land"],
     "PORT": ["port canaveral", "cocoa beach"],
@@ -247,7 +247,9 @@ DROPOFF_KEYWORDS = {
 
 
 def resolve_dropoff_zone_code(db: Session, dropoff_text: str) -> str | None:
-    """Reconnait la zone de destination par mot-cle dans le texte du client."""
+    """Reconnaît la destination (zone) par mot-cle simple dans le texte."""
+    if not dropoff_text:
+        return None
     text = dropoff_text.lower()
     for zone_code, keywords in DROPOFF_KEYWORDS.items():
         for kw in keywords:

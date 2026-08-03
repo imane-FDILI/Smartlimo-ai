@@ -12,6 +12,7 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Identifiants du compte SMTP utilisé pour l'envoi (lus depuis le fichier
