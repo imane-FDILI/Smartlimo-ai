@@ -26,19 +26,33 @@ US_HOLIDAYS_2026 = [
 ]
 
 
-def apply_surcharges(db: Session, base_price: float, pickup_time, pickup_date) -> float:
-    """Applique les suppléments simples (nuit, jour férié) au prix de base."""
+def apply_surcharges(db: Session, base_price: float, pickup_time, pickup_date, pickup_location: str, dropoff_location: str) -> float:
+    """Applique les suppléments simples (nuit, jour férié, frais aéroport/port)."""
     total = base_price
 
+    # Supplement nuit (deja fait)
     early_late = db.query(Surcharge).filter(Surcharge.code == "EARLY_LATE").first()
-    if early_late and pickup_time is not None:
-        if pickup_time.hour < 5 or pickup_time.hour >= 0 and pickup_time.hour < 5:
-            if 0 <= pickup_time.hour < 5:
-                total += early_late.amount
+    if early_late and pickup_time is not None and 0 <= pickup_time.hour < 5:
+        total += early_late.amount
 
+    # Supplement jour ferie (deja fait)
     holiday = db.query(Surcharge).filter(Surcharge.code == "HOLIDAY_SURCHARGE").first()
     if holiday and pickup_date is not None and pickup_date in US_HOLIDAYS_2026:
         total += total * (holiday.percent / 100)
+
+    # NOUVEAU : frais aeroport (si pickup = MCO ou SFB)
+    pickup_lower = pickup_location.lower()
+    if "mco" in pickup_lower or "airport" in pickup_lower or "sanford" in pickup_lower or "sfb" in pickup_lower:
+        airport_fee = db.query(Surcharge).filter(Surcharge.code == "AIRPORT_FEE_PORT_CANAVERAL").first()
+        if airport_fee and airport_fee.amount:
+            total += airport_fee.amount
+
+    # NOUVEAU : frais Port Canaveral (si pickup OU dropoff = port)
+    dropoff_lower = dropoff_location.lower()
+    if "port canaveral" in pickup_lower or "port canaveral" in dropoff_lower or "cocoa beach" in pickup_lower or "cocoa beach" in dropoff_lower:
+        port_fee = db.query(Surcharge).filter(Surcharge.code == "SERVICE_FEE").first()
+        if port_fee and port_fee.amount:
+            total += port_fee.amount
 
     return round(total, 2)
 
@@ -69,14 +83,14 @@ def parse_date(raw: str) -> date:
     return datetime.now().date() + timedelta(days=1)
 
 
-def parse_time(raw: str) -> time:
-    """Convertit une heure en langage naturel (ex: "2pm", "14:30") en
-    objet `time` Python. Retombe sur midi (12:00) par défaut si le texte
-    n'est pas reconnu."""
+def parse_time(raw: str):
+    text = raw.strip().lower()
+    if "midnight" in text:
+        return time(0, 0)
+    if "noon" in text:
+        return time(12, 0)
     parsed = dateparser.parse(raw)
-    if parsed:
-        return parsed.time()
-    return time(12, 0)
+    return parsed.time() if parsed else None
 
 
 def create_reservation(db: Session, slots: dict) -> Reservation:

@@ -162,10 +162,17 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
             slots[expected] = m.group()
             return True
     elif expected in ("name", "pickup_location", "dropoff_location", "date", "time"):
-        if len(text) >= 2:
-            slots[expected] = _format_name(text) if expected == "name" else text
+        if expected == "name":
+            # Retire l'email et le telephone du texte avant de le garder comme nom
+            cleaned = EMAIL_RE.sub("", text)
+            cleaned = PHONE_RE.sub("", cleaned)
+            cleaned = cleaned.strip()
+            if len(cleaned) >= 2:
+                slots[expected] = _format_name(cleaned)
+                return True
+        elif len(text) >= 2:
+            slots[expected] = text
             return True
-    return False
 
 
 def _next_missing(slots: dict):
@@ -218,14 +225,15 @@ def _lookup_history(email: str) -> str:
 def _compute_price(slots: dict):
     from app.database import SessionLocal
     from app.services.reservation_service import estimate_price_by_zone, apply_surcharges, parse_date, parse_time
-
     db = SessionLocal()
     try:
         price = estimate_price_by_zone(db, slots.get("pickup_location", ""), slots.get("dropoff_location", ""), slots.get("vehicle"))
         if price is not None:
             pickup_time = parse_time(str(slots.get("time", "")))
             pickup_date = parse_date(str(slots.get("date", "")))
-            price = apply_surcharges(db, price, pickup_time, pickup_date)
+            price = apply_surcharges(db, price, pickup_time, pickup_date,
+                          slots.get("pickup_location", ""),
+                          slots.get("dropoff_location", ""))
             slots["estimated_price"] = price
     finally:
         db.close()
@@ -418,11 +426,24 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
 
         if session["stage"] == "confirming":
             if intent == "confirm":
-                session["stage"] = "completed"
                 from app.database import SessionLocal
-                from app.services.reservation_service import create_reservation
+                from app.services.reservation_service import is_vehicle_available, create_reservation, parse_date, parse_time
+                
                 db = SessionLocal()
                 try:
+                    pickup_date = parse_date(str(session["slots"].get("date", "")))
+                    pickup_time = parse_time(str(session["slots"].get("time", "")))
+                    vehicle_name = session["slots"].get("vehicle")
+                    
+                    if vehicle_name and vehicle_name != "No Preference":
+                        available = is_vehicle_available(db, vehicle_name, pickup_date, pickup_time)
+                        if not available:
+                            session["stage"] = "collecting"
+                            session["slots"]["time"] = None
+                            session["expected"] = "time"
+                            return _reply(conversation_id, f"Sorry, the {vehicle_name} is not available at this time. Please provide a different time.")
+                    
+                    session["stage"] = "completed"
                     reservation = create_reservation(db, session["slots"])
                     reservation_id = reservation.id
                 finally:
@@ -567,6 +588,9 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         session["expected"] = "history_email"
         return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
 
+    if re.search(r"\b(child seat|car seat|booster)\b", message, re.I):
+        return _reply(conversation_id, "Sure! Child car seats and boosters are complimentary — no extra charge.")
+    
     if intent == "vehicle_information":
         return _reply(conversation_id, _vehicle_info())
 
@@ -597,6 +621,14 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         _compute_price(session["slots"])
         session["stage"] = "confirming"
         return _reply(conversation_id, _summary(session["slots"]))
+
+    if re.search(r"\b(meet and greet|meet & greet)\b", message, re.I):
+        return _reply(conversation_id, "Meet and Greet service is included at no extra charge — your driver will be there to welcome you.")
+
+    if intent == "tip":
+        if session.get("reservation_id") and session["slots"].get("estimated_price"):
+                return _reply(conversation_id, f"Gratuity is not automatically included. You're welcome to add a tip for your driver directly, at your discretion.")
+        return _reply(conversation_id, "You can add a tip for your driver at any time. Gratuity is not automatically included in the fare.")
 
     reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])
     return _reply(conversation_id, reply)
