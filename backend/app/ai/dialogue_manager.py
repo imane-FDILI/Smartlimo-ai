@@ -183,16 +183,20 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
             return False
         slots[expected] = text
         return True
-    elif expected in ("name", "date"):
-        if expected == "name":
-            cleaned = EMAIL_RE.sub("", text)
-            cleaned = PHONE_RE.sub("", cleaned)
-            cleaned = cleaned.strip()
-            if len(cleaned) >= 2:
-                slots[expected] = _format_name(cleaned)
-                return True
-        elif len(text) >= 2:
-            slots[expected] = text
+    elif expected == "date":
+        from app.services.reservation_service import parse_date
+        from datetime import date as date_type
+        parsed = parse_date(text)
+        if parsed < date_type.today():
+            return False
+        slots[expected] = text
+        return True
+    elif expected == "name":
+        cleaned = EMAIL_RE.sub("", text)
+        cleaned = PHONE_RE.sub("", cleaned)
+        cleaned = cleaned.strip()
+        if len(cleaned) >= 2:
+            slots[expected] = _format_name(cleaned)
             return True
     return False
 
@@ -502,6 +506,8 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             return _reply(conversation_id, "No problem, I've cancelled this booking process. Let me know if you need anything else!")
 
         if session["stage"] == "confirming":
+            if re.search(r"\b(child seat|car seats?|booster)\b", message, re.I):
+                return _reply(conversation_id, "Sure! Child car seats and boosters are complimentary — no extra charge.\n\nYour reservation is still pending - would you like to confirm it?")
             if intent == "confirm":
                 from app.database import SessionLocal
                 from app.services.reservation_service import is_vehicle_available, create_reservation, parse_date, parse_time, is_booking_in_advance
@@ -558,7 +564,15 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
 
         captured = _merge_entities(session["slots"], entities)
         if not captured:
-            _fill_expected(session["slots"], session["expected"], message)
+            filled = _fill_expected(session["slots"], session["expected"], message)
+            if not filled:
+                expected_field = session["expected"]
+                if expected_field == "time":
+                    return _reply(conversation_id, "Please provide a specific time with AM or PM (for example: 5:00 PM or 5pm).")
+                elif expected_field in ("pickup_location", "dropoff_location"):
+                    return _reply(conversation_id, "I couldn't recognize this location. Please provide a valid address, airport, or landmark (for example: MCO Airport, Walt Disney World).")
+                elif expected_field == "date":
+                    return _reply(conversation_id, "Please provide a future date (today or later).")
 
         key, question = _next_missing(session["slots"])
         if key:

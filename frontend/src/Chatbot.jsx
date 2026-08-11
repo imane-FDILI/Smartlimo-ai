@@ -2,6 +2,8 @@ import axios from "axios";
 import { useState, useRef, useEffect } from "react";
 import TripMap from "./TripMap";
 import { Check, Edit } from "lucide-react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const API_URL = "http://127.0.0.1:8000";
 
@@ -11,6 +13,7 @@ function Chatbot({ onClose }) {
   const messagesEndRef = useRef(null);
   const [showVehicleButtons, setShowVehicleButtons] = useState(false);
   const [showConfirmButtons, setShowConfirmButtons] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const isSessionExpired = () => {
     const savedTimestamp = localStorage.getItem("smartlimo_timestamp");
@@ -66,11 +69,6 @@ function Chatbot({ onClose }) {
       setConversationId(response.data.conversation_id);
 
       const data = response.data;
-      // Le message du bot est cree ici, avec un champ tripInfo initialement vide.
-      // Il sera rempli JUSTE APRES si un resume est detecte, AVANT d'etre
-      // ajoute a la liste des messages -> la carte reste ainsi rattachee
-      // a CE message precis, a sa place dans l'historique, meme si
-      // d'autres messages sont ajoutes ensuite.
       const botMessage = { sender: "bot", text: data.reply, tripInfo: null };
 
       if (data.reply.includes("reservation summary")) {
@@ -89,6 +87,7 @@ function Chatbot({ onClose }) {
           }
         }
       }
+      setShowDatePicker(data.reply.includes("What date would you like to travel"));
 
       setMessages((prev) => [...prev, botMessage]);
       setShowVehicleButtons(data.reply.includes("What type of vehicle would you prefer"));
@@ -116,8 +115,15 @@ function Chatbot({ onClose }) {
     sendMessage(vehicle);
   };
   const handleConfirmClick = (answer) => {
-  setShowConfirmButtons(false);
-  sendMessage(answer);
+    setShowConfirmButtons(false);
+    sendMessage(answer);
+  };
+  const handleDateSelect = (date) => {
+    setShowDatePicker(false);
+    const formatted = date.toLocaleDateString("en-US", {
+      year: "numeric", month: "long", day: "numeric"
+    });
+    sendMessage(formatted);
   };
 
   return (
@@ -131,8 +137,6 @@ function Chatbot({ onClose }) {
         {messages.map((msg, index) => (
           <div key={index} className={`message ${msg.sender}`}>
             {msg.text}
-            {/* La carte s'affiche ici, DANS le message concerne, si tripInfo
-                a ete rempli pour CE message precis lors de sa creation. */}
             {msg.tripInfo && (
               <TripMap
                 pickupCoords={msg.tripInfo.pickup_coords}
@@ -162,6 +166,17 @@ function Chatbot({ onClose }) {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {showDatePicker && (
+        <div className="date-picker-container">
+          <DatePicker
+            selected={null}
+            onChange={handleDateSelect}
+            minDate={new Date()}
+            inline
+          />
+        </div>
+      )}
 
       {showConfirmButtons && (
         <div className="confirm-buttons">

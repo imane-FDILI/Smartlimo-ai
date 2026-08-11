@@ -273,3 +273,58 @@ body {
   align-items: center;
   gap: 4px;
 }
+/* ===== Personnalisation du calendrier (react-datepicker) ===== */
+.date-picker-container {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+.react-datepicker {
+  font-family: inherit;
+  border: 1px solid #c9a227;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.react-datepicker__header {
+  background-color: #1a1a1a;
+  border-bottom: none;
+  padding-top: 12px;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: #c9a227;
+  font-weight: 600;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #c9a227;
+}
+
+.react-datepicker__day {
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.react-datepicker__day:hover {
+  background-color: #c9a22730;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #c9a227;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.react-datepicker__day--disabled {
+  color: #cccccc;
+}
+
+.react-datepicker__day--today {
+  font-weight: 700;
+  color: #c9a227;
+}
