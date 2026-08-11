@@ -49,7 +49,7 @@ SLOT_LABELS = {
 }
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
-PHONE_RE = re.compile(r"\+?\d[\d\s().-]{6,}\d")
+PHONE_RE = re.compile(r"\+?\d[\d\s().-]{8,}\d")
 NUM_RE = re.compile(r"\d+")
 NO_PREF_RE = re.compile(r"no preference|any|whatever|doesn'?t matter", re.I)
 ACCEPT_RECO_RE = re.compile(r"\b(yes|sure|ok|okay|sounds good|your recommendation|that one|the one you suggested|agree)\b", re.I)
@@ -87,6 +87,11 @@ INTENT_RESPONSES = {
     "goodbye": "Thank you for choosing SmartLimo! Have a wonderful day!",
     "unknown": "I'm sorry, I didn't quite understand that. I can help you book a ride, get a price, or track your driver.",
 }
+def _looks_like_phone(text: str) -> bool:
+    """Verifie qu'un texte matché par PHONE_RE contient assez de VRAIS
+    chiffres (pas juste des espaces) pour etre un telephone plausible."""
+    digits = re.sub(r"[^\d]", "", text)
+    return len(digits) >= 9  # un numero de telephone US a au moins 10 chiffres avec indicatif
 
 
 def _new_session():
@@ -119,6 +124,11 @@ def _scan_contact_info(slots: dict, message: str):
         if m:
             slots["phone"] = m.group()
 
+    if not slots.get("phone"):
+        m = PHONE_RE.search(message)
+        if m and _looks_like_phone(m.group()):
+            slots["phone"] = m.group()
+
 
 def _format_name(raw: str) -> str:
     parts = raw.strip().split()
@@ -142,9 +152,6 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
             slots[expected] = int(m.group())
             return True
     elif expected == "vehicle":
-        if NO_PREF_RE.search(text):
-            slots[expected] = "No Preference"
-            return True
         VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
         for name in VEHICLE_NAMES:
             if name.lower() in text.lower():
@@ -161,9 +168,23 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
         if m:
             slots[expected] = m.group()
             return True
-    elif expected in ("name", "pickup_location", "dropoff_location", "date", "time"):
+    elif expected == "time":
+        from app.services.reservation_service import parse_time, is_time_unambiguous
+        if not is_time_unambiguous(text):
+            return False
+        parsed = parse_time(text)
+        if parsed is not None:
+            slots[expected] = text
+            return True
+        return False
+    elif expected in ("pickup_location", "dropoff_location"):
+        from app.services.geo_service import geocode
+        if geocode(text) is None:
+            return False
+        slots[expected] = text
+        return True
+    elif expected in ("name", "date"):
         if expected == "name":
-            # Retire l'email et le telephone du texte avant de le garder comme nom
             cleaned = EMAIL_RE.sub("", text)
             cleaned = PHONE_RE.sub("", cleaned)
             cleaned = cleaned.strip()
@@ -173,6 +194,7 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
         elif len(text) >= 2:
             slots[expected] = text
             return True
+    return False
 
 
 def _next_missing(slots: dict):
@@ -273,19 +295,21 @@ def _vehicle_info() -> str:
 
 def _vehicle_prefix(slots: dict) -> str:
     from app.database import SessionLocal
-    from app.services.reservation_service import recommend_vehicle
+    from app.services.reservation_service import recommend_vehicle, get_eligible_vehicles
     db = SessionLocal()
     try:
         v = recommend_vehicle(db, slots.get("passengers") or 1, slots.get("luggage") or 0)
+        eligible = get_eligible_vehicles(db, slots.get("passengers") or 1, slots.get("luggage") or 0)
     finally:
         db.close()
+    prefix = ""
     if v:
         slots["_recommended_vehicle"] = v.name
-        return f"Based on {slots.get('passengers')} passenger(s) and {slots.get('luggage')} bag(s), I recommend the {v.name}.\n"
-    return ""
+        prefix = f"Based on {slots.get('passengers')} passenger(s) and {slots.get('luggage')} bag(s), I recommend the {v.name}.\n"
+        options = eligible if eligible else []
+    return prefix
 
-
-def _apply_modification(session: dict, entities: dict) -> str | None:
+def _apply_modification(session: dict, entities: dict, message: str = "") -> str | None:
     FIELD_MAP = [
         ("time", "pickup_time", "time"),
         ("date", "pickup_date", "date"),
@@ -298,28 +322,81 @@ def _apply_modification(session: dict, entities: dict) -> str | None:
     from app.database import SessionLocal
     from app.services.reservation_service import update_reservation, parse_date, parse_time
 
+    # NOUVEAU : detecter explicitement le champ cible par mot-cle dans le message
+    message_lower = message.lower()
+    target_field = None
+    if "destination" in message_lower or "dropoff" in message_lower:
+        target_field = "dropoff_location"
+    elif "pickup" in message_lower and "location" in message_lower:
+        target_field = "pickup_location"
+    elif re.search(r"\bpickup\b", message_lower) and "destination" not in message_lower:
+        target_field = "pickup_location"
+    elif "vehicle" in message_lower or ("car" in message_lower and "seat" not in message_lower):
+        from app.models import Vehicle
+        VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
+        matched_vehicle = None
+        for name in VEHICLE_NAMES:
+            if name.lower() in message_lower:
+                matched_vehicle = name
+                break
+        if matched_vehicle:
+            db = SessionLocal()
+            try:
+                vehicle = db.query(Vehicle).filter(Vehicle.name == matched_vehicle).first()
+                if vehicle:
+                    ok = update_reservation(db, session["reservation_id"], "vehicle_id", vehicle.id)
+                else:
+                    ok = False
+            finally:
+                db.close()
+            if ok:
+                return f"Done! Your vehicle has been updated to {matched_vehicle}."
+            return "Sorry, I couldn't find that reservation."
+    if target_field:
+        value = entities.get(target_field) or entities.get("pickup_location") or entities.get("dropoff_location")
+        if value:
+            db = SessionLocal()
+            try:
+                ok = update_reservation(db, session["reservation_id"], target_field, value)
+            finally:
+                db.close()
+            if ok:
+                from app.models import Reservation
+                db2 = SessionLocal()
+                try:
+                    updated_res = db2.get(Reservation, session["reservation_id"])
+                    summary = (
+                        f"\n\nHere is your updated reservation summary:\n"
+                        f"- Pickup: {updated_res.pickup_location}\n"
+                        f"- Destination: {updated_res.dropoff_location}\n"
+                        f"- Date: {updated_res.pickup_date}\n"
+                        f"- Time: {updated_res.pickup_time}\n"
+                        f"- Passengers: {updated_res.passengers}\n"
+                        f"- Luggage: {updated_res.luggage}"
+                    )
+                finally:
+                    db2.close()
+                return f"Done! Your {target_field.replace('_', ' ')} has been updated to {value}.{summary}"
+            return "Sorry, I couldn't find that reservation."
+    # Comportement existant (fallback) pour les autres champs
     for entity_key, column_name, conversion in FIELD_MAP:
         value = entities.get(entity_key)
         if value is None:
             continue
-
         if conversion == "time":
             value = parse_time(str(value))
         elif conversion == "date":
             value = parse_date(str(value))
-
         db = SessionLocal()
         try:
             ok = update_reservation(db, session["reservation_id"], column_name, value)
         finally:
             db.close()
-
         if ok:
             return f"Done! Your {column_name.replace('_', ' ')} has been updated to {value}."
         return "Sorry, I couldn't find that reservation."
 
     return None
-
 
 def handle_message(conversation_id: str | None, message: str) -> dict:
     if not conversation_id or conversation_id not in SESSIONS:
@@ -410,7 +487,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
 
     if session.get("expected") == "modify_detail" and session.get("reservation_id"):
         session["expected"] = None
-        confirmation = _apply_modification(session, entities)
+        confirmation = _apply_modification(session, entities, message)
         if confirmation:
             return _reply(conversation_id, confirmation)
         return _reply(conversation_id, "I didn't catch what to change. Try: 'change my pickup time to 5pm'.")
@@ -427,22 +504,25 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         if session["stage"] == "confirming":
             if intent == "confirm":
                 from app.database import SessionLocal
-                from app.services.reservation_service import is_vehicle_available, create_reservation, parse_date, parse_time
-                
+                from app.services.reservation_service import is_vehicle_available, create_reservation, parse_date, parse_time, is_booking_in_advance
+
                 db = SessionLocal()
                 try:
                     pickup_date = parse_date(str(session["slots"].get("date", "")))
                     pickup_time = parse_time(str(session["slots"].get("time", "")))
                     vehicle_name = session["slots"].get("vehicle")
-                    
-                    if vehicle_name and vehicle_name != "No Preference":
+
+                    if not is_booking_in_advance(pickup_date, pickup_time):
+                        return _reply(conversation_id, "Sorry, reservations must be made at least 24 hours in advance. Please provide a different date or time.")
+
+                    if vehicle_name:
                         available = is_vehicle_available(db, vehicle_name, pickup_date, pickup_time)
                         if not available:
                             session["stage"] = "collecting"
                             session["slots"]["time"] = None
                             session["expected"] = "time"
                             return _reply(conversation_id, f"Sorry, the {vehicle_name} is not available at this time. Please provide a different time.")
-                    
+
                     session["stage"] = "completed"
                     reservation = create_reservation(db, session["slots"])
                     reservation_id = reservation.id
@@ -561,7 +641,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             return _reply(conversation_id, "I don't see an active reservation to modify. Would you like to book one, or check your past reservations?")
 
         session["reservation_id"] = reservation_id
-        confirmation = _apply_modification(session, entities)
+        confirmation = _apply_modification(session, entities, message)
         if confirmation:
             return _reply(conversation_id, confirmation)
         session["expected"] = "modify_detail"

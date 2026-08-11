@@ -19,23 +19,21 @@ HEADERS = {"User-Agent": "SmartLimoAI/1.0 (stage project)"}
 
 
 def geocode(place: str):
-    # Transforme un nom de lieu en coordonnees GPS via Nominatim (OpenStreetMap)
-    # Retourne (latitude, longitude) ou None si introuvable
     place = place.strip().strip(".")
-    place = resolve_location(place)   # corrige les fautes de frappe via le gazetteer
     url = "https://nominatim.openstreetmap.org/search"
-    # 1ere tentative : le lieu tel quel (deja precis pour les noms du gazetteer,
-    # ex: "Miami International Airport"). 2eme tentative : on ajoute la region
-    # pour desambiguiser les adresses generiques (ex: "the airport").
-    for query in (place, f"{place}, Florida, USA"):
-        params = {"q": query, "format": "json", "limit": 1}
-        resp = requests.get(url, params=params, headers=HEADERS, timeout=5)
-        results = resp.json()                    # la reponse JSON -> liste Python
-        if results:
-            # Nominatim retourne toujours lat/lon sous forme de chaînes de
-            # caractères : conversion explicite en float nécessaire.
-            return float(results[0]["lat"]), float(results[0]["lon"])
-    return None
+    params = {
+        "q": f"{place}, Florida, USA",
+        "format": "json",
+        "limit": 1,
+        "countrycodes": "us",              # NOUVEAU : limite aux USA
+        "viewbox": "-87.6,31.0,-79.8,24.4", # NOUVEAU : boite englobant la Floride
+        "bounded": 1,                        # NOUVEAU : force la recherche DANS cette boite
+    }
+    resp = requests.get(url, params=params, headers=HEADERS, timeout=5)
+    results = resp.json()
+    if not results:
+        return None
+    return float(results[0]["lat"]), float(results[0]["lon"])
 
 
 def get_route(pickup: str, dropoff: str):

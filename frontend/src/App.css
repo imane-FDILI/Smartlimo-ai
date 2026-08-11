@@ -263,3 +263,13 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+.confirm-btn-yes, .confirm-btn-no {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.trip-info-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

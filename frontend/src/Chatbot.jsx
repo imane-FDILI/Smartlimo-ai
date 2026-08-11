@@ -1,19 +1,49 @@
 import axios from "axios";
 import { useState, useRef, useEffect } from "react";
 import TripMap from "./TripMap";
+import { Check, Edit } from "lucide-react";
 
 const API_URL = "http://127.0.0.1:8000";
 
 function Chatbot({ onClose }) {
-  const [messages, setMessages] = useState([
-    { sender: "bot", text: "Hello!  Welcome to SmartLimo AI.I'm here to help you book your limousine in just a few messages.Where would you like to be picked up?" },
-  ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState(null);
   const messagesEndRef = useRef(null);
   const [showVehicleButtons, setShowVehicleButtons] = useState(false);
   const [showConfirmButtons, setShowConfirmButtons] = useState(false);
+
+  const isSessionExpired = () => {
+    const savedTimestamp = localStorage.getItem("smartlimo_timestamp");
+    const maxAgeMs = 24 * 60 * 60 * 1000;
+    return savedTimestamp && Date.now() - parseInt(savedTimestamp) > maxAgeMs;
+  };
+
+  if (isSessionExpired()) {
+    localStorage.removeItem("smartlimo_conversation_id");
+    localStorage.removeItem("smartlimo_messages");
+    localStorage.removeItem("smartlimo_timestamp");
+  }
+
+  const [conversationId, setConversationId] = useState(
+    () => localStorage.getItem("smartlimo_conversation_id") || null
+  );
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem("smartlimo_messages");
+    return saved ? JSON.parse(saved) : [
+      { sender: "bot", text: "Hello!  Welcome to SmartLimo AI.I'm here to help you book your limousine in just a few messages.Where would you like to be picked up?" },
+    ];
+  });
+
+  useEffect(() => {
+    if (conversationId) {
+      localStorage.setItem("smartlimo_conversation_id", conversationId);
+      localStorage.setItem("smartlimo_timestamp", Date.now().toString());
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    localStorage.setItem("smartlimo_messages", JSON.stringify(messages));
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -118,22 +148,28 @@ function Chatbot({ onClose }) {
 
         {showVehicleButtons && (
           <div className="vehicle-buttons">
-            {["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN", "No Preference"].map((v) => (
-              <button key={v} className="vehicle-btn" onClick={() => handleVehicleClick(v)}>
-                {v}
-              </button>
-            ))}
+            {(() => {
+              const lastBotMessage = messages.filter(m => m.sender === "bot").slice(-1)[0];
+              const match = lastBotMessage?.text.match(/Available options: (.+)/);
+              const options = match ? match[1].split(", ") : ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"];
+              return options.map((v) => (
+                <button key={v} className="vehicle-btn" onClick={() => handleVehicleClick(v)}>
+                  {v}
+                </button>
+              ));
+            })()}
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
+
       {showConfirmButtons && (
         <div className="confirm-buttons">
           <button className="confirm-btn-yes" onClick={() => handleConfirmClick("yes")}>
-            ✓ Confirmer la réservation
+            <Check size={16} /> Confirm Reservation
           </button>
           <button className="confirm-btn-no" onClick={() => handleConfirmClick("no")}>
-            Modifier
+            <Edit size={16} /> Modify
           </button>
         </div>
       )}

@@ -8,6 +8,18 @@ parse_time ne sont pas importés ici) : tel quel, l'appeler provoquerait une
 NameError. Il s'agit probablement d'une ébauche de fonctionnalité pas encore
 branchée au reste de l'application.
 """
+from datetime import datetime
+from sqlalchemy.orm import Session
+from app.models.reservation import Reservation
+
+
+def parse_date(date_str: str):
+    return datetime.strptime(date_str, "%Y-%m-%d").date()
+
+
+def parse_time(time_str: str):
+    return datetime.strptime(time_str, "%H:%M").time()
+
 
 def is_vehicle_available(db: Session, slots: dict) -> bool:
     """Vérifie si un véhicule est disponible pour la réservation.

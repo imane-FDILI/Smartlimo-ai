@@ -17,6 +17,16 @@ from app.models import User, Reservation, Vehicle, Zone, Rate, ZoneZipcode, Surc
 from app.services.geo_service import get_route
 from app.services.pricing_service import get_fixed_rate
 import datetime as dt
+from datetime import datetime, timedelta
+import re
+
+def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
+    """Verifie que la reservation est faite au moins min_hours avant le depart."""
+    if pickup_date is None or pickup_time is None:
+        return True  # pas assez d'info pour verifier, on laisse passer
+    pickup_datetime = datetime.combine(pickup_date, pickup_time)
+    now = datetime.now()
+    return pickup_datetime - now >= timedelta(hours=min_hours)
 
 US_HOLIDAYS_2026 = [
     dt.date(2026, 1, 1),   # New Year
@@ -25,6 +35,21 @@ US_HOLIDAYS_2026 = [
     # liste non exhaustive - a completer si besoin
 ]
 
+def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
+    """Verifie que la reservation est faite au moins min_hours avant le depart."""
+    if pickup_date is None or pickup_time is None:
+        return True
+    pickup_datetime = datetime.combine(pickup_date, pickup_time)
+    now = datetime.now()
+    return pickup_datetime - now >= timedelta(hours=min_hours)
+
+def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
+    """Verifie que la reservation est faite au moins min_hours avant le depart."""
+    if pickup_date is None or pickup_time is None:
+        return True  # pas assez d'info pour verifier, on laisse passer
+    pickup_datetime = datetime.combine(pickup_date, pickup_time)
+    now = datetime.now()
+    return pickup_datetime - now >= timedelta(hours=min_hours)
 
 def apply_surcharges(db: Session, base_price: float, pickup_time, pickup_date, pickup_location: str, dropoff_location: str) -> float:
     """Applique les suppléments simples (nuit, jour férié, frais aéroport/port)."""
@@ -91,6 +116,16 @@ def parse_time(raw: str):
         return time(12, 0)
     parsed = dateparser.parse(raw)
     return parsed.time() if parsed else None
+
+def is_time_unambiguous(raw: str) -> bool:
+    text = raw.strip().lower()
+    if "midnight" in text or "noon" in text:
+        return True
+    if re.search(r"(am|pm|a\.m\.|p\.m\.)\b", text, re.I):
+        return True
+    if re.search(r"^\d{1,2}:\d{2}$", text):
+        return True
+    return False
 
 
 def create_reservation(db: Session, slots: dict) -> Reservation:
@@ -333,3 +368,19 @@ def is_vehicle_available(db: Session, vehicle_name: str, pickup_date, pickup_tim
             return False
 
     return True
+
+def get_eligible_vehicles(db: Session, passengers: int, luggage: int = 0):
+    """Retourne la liste des vehicules dont la capacite est suffisante."""
+    vehicles = db.query(Vehicle).filter(
+        Vehicle.capacity >= passengers,
+        Vehicle.luggage >= luggage
+    ).order_by(Vehicle.capacity).all()
+    return [v.name for v in vehicles]
+
+def get_eligible_vehicles(db: Session, passengers: int, luggage: int = 0):
+    """Retourne les vehicules dont la capacite est suffisante, tries du plus petit au plus grand."""
+    vehicles = db.query(Vehicle).filter(
+        Vehicle.capacity >= passengers,
+        Vehicle.luggage >= luggage
+    ).order_by(Vehicle.capacity).all()
+    return [v.name for v in vehicles]

@@ -8,6 +8,7 @@
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";   // VITAL : sans ce CSS, les tuiles sont invisibles !
 import L from "leaflet";
+import { MapPin, Clock } from "lucide-react";
 
 // Pastilles colorees facon Apple (vert = depart, rouge = arrivee)
 // Construit une icône Leaflet personnalisée : un simple rond coloré avec
@@ -66,9 +67,13 @@ function TripMap({ pickupCoords, dropoffCoords, distanceKm, durationMin, geometr
       </MapContainer>
 
       <div className="trip-info">
-        <span>📍 {distanceKm} km</span>
+        <span className="trip-info-item">
+          <MapPin size={14} /> {distanceKm} km
+        </span>
         <span className="trip-sep">•</span>
-        <span>🕐 ~{durationMin} min</span>
+        <span className="trip-info-item">
+          <Clock size={14} /> ~{durationMin} min
+        </span>
       </div>
     </div>
   );
