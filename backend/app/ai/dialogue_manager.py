@@ -520,15 +520,6 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
 
                     if not is_booking_in_advance(pickup_date, pickup_time):
                         return _reply(conversation_id, "Sorry, reservations must be made at least 24 hours in advance. Please provide a different date or time.")
-
-                    if vehicle_name:
-                        available = is_vehicle_available(db, vehicle_name, pickup_date, pickup_time)
-                        if not available:
-                            session["stage"] = "collecting"
-                            session["slots"]["time"] = None
-                            session["expected"] = "time"
-                            return _reply(conversation_id, f"Sorry, the {vehicle_name} is not available at this time. Please provide a different time.")
-
                     session["stage"] = "completed"
                     reservation = create_reservation(db, session["slots"])
                     reservation_id = reservation.id
