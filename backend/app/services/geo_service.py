@@ -17,9 +17,24 @@ from app.ai.entity_extractor import resolve_location
 # blocage de l'IP appelante).
 HEADERS = {"User-Agent": "SmartLimoAI/1.0 (stage project)"}
 
+LOCATION_ALIASES = {
+    "lego land": "Legoland",
+    "disney world": "Walt Disney World",
+    "disney land": "Walt Disney World",
+    "disneyworld": "Walt Disney World",
+    "universal": "Universal Studios",
+    "universal studios florida": "Universal Studios",
+    "kissimmee": "Kissimmee",
+    "davenport": "Davenport",
+    "port canaveral": "Port Canaveral",
+    "sea world": "SeaWorld",
+    "sanford airport": "Orlando Sanford International Airport",
+}
+
 
 def geocode(place: str):
     place = place.strip().strip(".")
+    place = LOCATION_ALIASES.get(place.lower(), place)
     url = "https://nominatim.openstreetmap.org/search"
     params = {
         "q": f"{place}, Florida, USA",

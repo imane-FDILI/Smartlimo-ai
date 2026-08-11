@@ -194,7 +194,9 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
     elif expected == "name":
         cleaned = EMAIL_RE.sub("", text)
         cleaned = PHONE_RE.sub("", cleaned)
-        cleaned = cleaned.strip()
+        cleaned = re.sub(r"\b(name|phone|email)\s*:?\s*", "", cleaned, flags=re.I)
+        cleaned = re.sub(r"[-:]", " ", cleaned).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
         if len(cleaned) >= 2:
             slots[expected] = _format_name(cleaned)
             return True
@@ -217,7 +219,14 @@ def _summary(slots: dict) -> str:
         lines.append(f"- Extras: {', '.join(slots['extras'])}")
     if slots.get("estimated_price"):
         lines.append(f"- Estimated price: ${slots['estimated_price']}")
-    lines += ["", "Would you like to confirm your reservation?"]
+    lines += [
+        "",
+        "Good to know: child seats and boosters are complimentary. A night "
+        "surcharge ($20) applies between midnight and 5am, and holiday dates "
+        "carry a 20% surcharge. Gratuity is not included automatically.",
+        "",
+        "Would you like to confirm your reservation?"
+    ]
     return "\n".join(lines)
 
 
@@ -310,7 +319,8 @@ def _vehicle_prefix(slots: dict) -> str:
     if v:
         slots["_recommended_vehicle"] = v.name
         prefix = f"Based on {slots.get('passengers')} passenger(s) and {slots.get('luggage')} bag(s), I recommend the {v.name}.\n"
-        options = eligible if eligible else []
+    if eligible:
+        prefix += f"Available options: {', '.join(eligible)}\n"
     return prefix
 
 def _apply_modification(session: dict, entities: dict, message: str = "") -> str | None:
@@ -673,7 +683,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         session["expected"] = "history_email"
         return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
 
-    if re.search(r"\b(child seat|car seat|booster)\b", message, re.I):
+    if re.search(r"\b(child seat|car seats?|boosters?)\b", message, re.I):
         return _reply(conversation_id, "Sure! Child car seats and boosters are complimentary — no extra charge.")
     
     if intent == "vehicle_information":

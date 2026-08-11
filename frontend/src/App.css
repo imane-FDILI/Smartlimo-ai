@@ -176,14 +176,30 @@ body {
   border-color: #d4af37;
 }
 
-.chatbot-input button {
-  padding: 10px 18px;
+.send-button {
+  width: 42px;
+  height: 42px;
   border: none;
-  border-radius: 20px;
+  border-radius: 50%;
   background: #14141c;
-  color: #ffffff;
+  color: white;
   cursor: pointer;
-  font-size: 14px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.2s ease;
+}
+
+.send-button:hover {
+  background: #d4af37;
+  color: #14141c;
+  transform: scale(1.08);
+}
+
+.send-button:active {
+  transform: scale(0.95);
 }
 .vehicle-buttons {
   display: flex;
@@ -327,4 +343,62 @@ body {
 .react-datepicker__day--today {
   font-weight: 700;
   color: #c9a227;
+}
+/* ---------- Typing indicator ---------- */
+
+.typing-indicator {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: #e9e9ef;
+  color: #555;
+
+  padding: 10px 14px;
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+
+  font-size: 12px;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  background: #d4af37;
+  border-radius: 50%;
+
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
