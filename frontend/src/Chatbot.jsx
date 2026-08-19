@@ -1,10 +1,10 @@
 import axios from "axios";
 import { useState, useRef, useEffect } from "react";
 import TripMap from "./TripMap";
-import { Check, Edit, Send } from "lucide-react";
+import { Check, Edit, X, Send, MapPin, Calendar, Clock, Users, Briefcase, Car, DollarSign, Baby } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { MapPin, Calendar, Clock, Users, Briefcase, Car, DollarSign, Baby } from "lucide-react";
+
 const API_URL = "http://127.0.0.1:8000";
 
 function Chatbot({ onClose }) {
@@ -396,8 +396,7 @@ function Chatbot({ onClose }) {
 
       {/* CONFIRMATION */}
       {showConfirmButtons && (
-        <div className="confirm-buttons">
-
+                <div className="confirm-buttons">
           <button
             className="confirm-btn-yes"
             onClick={() =>
@@ -407,7 +406,6 @@ function Chatbot({ onClose }) {
             <Check size={16} />
             Confirm Reservation
           </button>
-
           <button
             className="confirm-btn-no"
             onClick={() =>
@@ -417,7 +415,15 @@ function Chatbot({ onClose }) {
             <Edit size={16} />
             Modify
           </button>
-
+          <button
+            className="confirm-btn-cancel"
+            onClick={() =>
+              handleConfirmClick("cancel my reservation")
+            }
+          >
+            <X size={16} />
+            Cancel
+          </button>
         </div>
       )}
 

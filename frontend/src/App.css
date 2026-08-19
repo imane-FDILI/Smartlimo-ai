@@ -408,3 +408,15 @@ body {
   gap: 6px;
   margin: 4px 0;
 }
+.confirm-btn-cancel {
+  background: transparent;
+  border: 1.5px solid #000000;
+  color: #02020285;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

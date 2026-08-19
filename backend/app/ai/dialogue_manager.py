@@ -104,7 +104,14 @@ def _merge_entities(slots: dict, entities: dict):
     for key in ("pickup_location", "dropoff_location", "date", "time",
                 "passengers", "luggage", "vehicle", "service_type", "occasion"):
         if entities.get(key) not in (None, []) and not slots.get(key):
-            slots[key] = entities[key]
+            value = entities[key]
+            if key == "passengers":
+                try:
+                    if int(value) > 14:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+            slots[key] = value
             if key in SLOT_LABELS:
                 captured.append(key)
     if entities.get("extras"):
@@ -113,7 +120,6 @@ def _merge_entities(slots: dict, entities: dict):
             if e not in slots["extras"]:
                 slots["extras"].append(e)
     return captured
-
 
 def _scan_contact_info(slots: dict, message: str):
     if not slots.get("email"):
@@ -144,13 +150,16 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
     text = message.strip().strip(".")
     if not expected or slots.get(expected):
         return False
-    if expected in ("passengers", "luggage"):
-        if NONE_RE.search(text):
+        if expected in ("passengers", "luggage"):
+         if NONE_RE.search(text):
             slots[expected] = 0
             return True
         m = NUM_RE.search(text)
         if m:
-            slots[expected] = int(m.group())
+            value = int(m.group())
+            if expected == "passengers" and value > 14:
+                return False
+            slots[expected] = value
             return True
     elif expected == "vehicle":
         VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
@@ -470,16 +479,16 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
                 from app.services.reservation_service import recommend_vehicle
                 db = SessionLocal()
                 try:
-                    v = recommend_vehicle(db, 1, 0)
+                    v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
                 finally:
                     db.close()
                 vehicle = v.name if v else "Sedan"
                 session["slots"]["vehicle"] = vehicle
             else:
-                return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, Sprinter VAN, or No Preference.")
+                return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, or Sprinter VAN.")
         session["expected"] = "pricing_compare"
         quote = _price_quote(session["slots"]["pickup_location"], session["slots"]["dropoff_location"], vehicle)
-        return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, or Sprinter VAN.")
+        return _reply(conversation_id, quote)
 
     if session.get("expected") == "pricing_compare":
         VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
@@ -493,7 +502,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             from app.services.reservation_service import recommend_vehicle
             db = SessionLocal()
             try:
-                v = recommend_vehicle(db, 1, 0)
+                                v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
             finally:
                 db.close()
             found = v.name if v else "Sedan"
@@ -609,6 +618,8 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
                     return _reply(conversation_id, "I couldn't recognize this location. Please provide a valid address, airport, or landmark (for example: MCO Airport, Walt Disney World).")
                 elif expected_field == "date":
                     return _reply(conversation_id, "Please provide a future date (today or later).")
+                elif expected_field == "passengers":
+                    return _reply(conversation_id, "Sorry, our largest vehicle accommodates up to 14 passengers. For larger groups, please contact us directly to arrange multiple vehicles.")
 
         key, question = _next_missing(session["slots"])
         if key:
