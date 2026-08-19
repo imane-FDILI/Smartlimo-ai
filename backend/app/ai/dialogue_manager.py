@@ -150,8 +150,8 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
     text = message.strip().strip(".")
     if not expected or slots.get(expected):
         return False
-        if expected in ("passengers", "luggage"):
-         if NONE_RE.search(text):
+    if expected in ("passengers", "luggage"):
+        if NONE_RE.search(text):
             slots[expected] = 0
             return True
         m = NUM_RE.search(text)
@@ -211,7 +211,6 @@ def _fill_expected(slots: dict, expected: str, message: str) -> bool:
             slots[expected] = _format_name(cleaned)
             return True
     return False
-
 
 def _next_missing(slots: dict):
     for key, question in REQUIRED_SLOTS:
@@ -456,10 +455,27 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         if ok:
             return _reply(conversation_id, f"Your reservation #{candidate_id} has been cancelled. We hope to see you again soon!")
         return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
-
-    if session.get("expected") == "history_email" and session["slots"].get("email"):
+    if session.get("expected") == "modify_email" and session["slots"].get("email"):
         session["expected"] = None
-        return _reply(conversation_id, _lookup_history(session["slots"]["email"]))
+        reservation_id = session["slots"].pop("_pending_modify_id", None)
+        if reservation_id:
+            session["reservation_id"] = reservation_id
+            session["expected"] = "modify_detail"
+            return _reply(conversation_id, "Sure! What would you like to change? (for example: change my pickup time to 5pm)")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+    if session.get("expected") == "modify_date_picker":
+        from app.services.reservation_service import update_reservation, parse_date
+        from app.database import SessionLocal
+        parsed = parse_date(message)
+        db = SessionLocal()
+        try:
+            ok = update_reservation(db, session["reservation_id"], "pickup_date", parsed)
+        finally:
+            db.close()
+        session["expected"] = None
+        if ok:
+            return _reply(conversation_id, f"Done! Your pickup date has been updated to {parsed}.")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
 
     if session.get("expected") == "pricing_locations":
         _merge_entities(session["slots"], entities)
@@ -548,6 +564,9 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         confirmation = _apply_modification(session, entities, message)
         if confirmation:
             return _reply(conversation_id, confirmation)
+        if re.search(r"\bdate\b", message, re.I) and not re.search(r"\btime\b", message, re.I):
+            session["expected"] = "modify_date_picker"
+            return _reply(conversation_id, "What date would you like to travel?")
         return _reply(conversation_id, "I didn't catch what to change. Try: 'change my pickup time to 5pm'.")
 
     # =====================================================================
@@ -700,7 +719,11 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         reservation_id = target_reservation_id or session.get("reservation_id")
 
         if not reservation_id:
-            return _reply(conversation_id, "I don't see an active reservation to modify. Would you like to book one, or check your past reservations?")
+                if num_match:
+                    session["expected"] = "modify_email"
+                    session["slots"]["_pending_modify_id"] = int(num_match.group(1))
+                    return _reply(conversation_id, "Could you give me your email so I can find that reservation?")
+                return _reply(conversation_id, "I don't see an active reservation to modify. Would you like to book one, or check your past reservations?")
 
         session["reservation_id"] = reservation_id
         confirmation = _apply_modification(session, entities, message)
