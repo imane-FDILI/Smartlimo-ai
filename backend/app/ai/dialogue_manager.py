@@ -55,6 +55,7 @@ NO_PREF_RE = re.compile(r"no preference|any|whatever|doesn'?t matter", re.I)
 ACCEPT_RECO_RE = re.compile(r"\b(yes|sure|ok|okay|sounds good|your recommendation|that one|the one you suggested|agree)\b", re.I)
 NONE_RE = re.compile(r"\b(none|no|zero|nothing)\b", re.I)
 RESERVATION_NUM_RE = re.compile(r"#?(\d+)")
+CHILD_SEAT_REQUEST_RE = re.compile(r"\b(need|want|add|include|with)\s+.*(child seat|booster)", re.I)
 
 # Mots-clés reconnus pour identifier quel slot l'utilisateur veut modifier
 # après avoir refusé (deny) le résumé de réservation (voir "edit_field"
@@ -214,9 +215,21 @@ def _summary(slots: dict) -> str:
     lines = ["Perfect! Here is your reservation summary:", ""]
     for key, _ in REQUIRED_SLOTS:
         if slots.get(key) or slots.get(key) == 0:
-            lines.append(f"- {SLOT_LABELS[key]}: {slots[key]}")
+            value = slots[key]
+            if key == "date":
+                from app.services.reservation_service import parse_date
+                parsed_date = parse_date(str(value))
+                value = parsed_date.strftime("%B %d, %Y")
+            elif key == "time":
+                from app.services.reservation_service import parse_time
+                parsed_time = parse_time(str(value))
+                if parsed_time:
+                    value = parsed_time.strftime("%I:%M %p").lstrip("0")
+            lines.append(f"- {SLOT_LABELS[key]}: {value}")
     if slots.get("extras"):
         lines.append(f"- Extras: {', '.join(slots['extras'])}")
+    if slots.get("child_seat_requested"):
+        lines.append("- Child seat: Requested (your driver will have it ready)")
     if slots.get("estimated_price"):
         lines.append(f"- Estimated price: ${slots['estimated_price']}")
     lines += [
@@ -229,13 +242,11 @@ def _summary(slots: dict) -> str:
     ]
     return "\n".join(lines)
 
-
 def _acknowledge(captured: list, slots: dict) -> str:
     if len(captured) < 2:
         return ""
-    items = ", ".join(f"{SLOT_LABELS[k]}: {slots[k]}" for k in captured)
-    return f"Great! I already have - {items}.\n"
-
+    items = ", ".join(f"{slots[k]}" for k in captured)
+    return f"Got it: {items}.\n"
 
 def _format_history(reservations) -> str:
     if not reservations:
@@ -422,6 +433,21 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
     entities = extract_entities(message)
     _scan_contact_info(session["slots"], message)
 
+    if session.get("expected") == "cancel_email" and session["slots"].get("email"):
+        session["expected"] = None
+        candidate_id = session["slots"].pop("_pending_cancel_id", None)
+        from app.database import SessionLocal
+        from app.models import User, Reservation
+        from app.services.reservation_service import cancel_reservation
+        db = SessionLocal()
+        try:
+            ok = cancel_reservation(db, candidate_id) if candidate_id else False
+        finally:
+            db.close()
+        if ok:
+            return _reply(conversation_id, f"Your reservation #{candidate_id} has been cancelled. We hope to see you again soon!")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+
     if session.get("expected") == "history_email" and session["slots"].get("email"):
         session["expected"] = None
         return _reply(conversation_id, _lookup_history(session["slots"]["email"]))
@@ -439,7 +465,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         _fill_expected(session["slots"], "vehicle", message)
         vehicle = session["slots"].get("vehicle")
         if not vehicle:
-            if re.search(r"\b(recommend|recommendation|suggest|your choice)\b", message, re.I):
+            if re.search(r"\b(recommend\w*|recommand\w*|suggest\w*|your choice|details|info|which (one|vehicle)|what.*(recommend|suggest))\b", message, re.I):
                 from app.database import SessionLocal
                 from app.services.reservation_service import recommend_vehicle
                 db = SessionLocal()
@@ -453,7 +479,7 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
                 return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, Sprinter VAN, or No Preference.")
         session["expected"] = "pricing_compare"
         quote = _price_quote(session["slots"]["pickup_location"], session["slots"]["dropoff_location"], vehicle)
-        return _reply(conversation_id, quote + "\n\n" + _vehicle_info())
+        return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, or Sprinter VAN.")
 
     if session.get("expected") == "pricing_compare":
         VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
@@ -462,6 +488,15 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             if name.lower() in message.lower():
                 found = name
                 break
+        if not found and re.search(r"\b(recommend\w*|recommand\w*|suggest\w*|your choice|details|info|which (one|vehicle))\b", message, re.I):
+            from app.database import SessionLocal
+            from app.services.reservation_service import recommend_vehicle
+            db = SessionLocal()
+            try:
+                v = recommend_vehicle(db, 1, 0)
+            finally:
+                db.close()
+            found = v.name if v else "Sedan"
         if found:
             session["slots"]["vehicle"] = found
             return _reply(conversation_id, _price_quote(
@@ -614,8 +649,9 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         reservation_id = target_reservation_id or session.get("reservation_id")
 
         if not reservation_id:
+            session["expected"] = "cancel_email"
+            session["slots"]["_pending_cancel_id"] = candidate_id if num_match else None
             return _reply(conversation_id, "Could you give me your email so I can find that reservation?")
-
         from app.database import SessionLocal
         from app.services.reservation_service import cancel_reservation
         db = SessionLocal()
@@ -683,8 +719,10 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         session["expected"] = "history_email"
         return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
 
-    if re.search(r"\b(child seat|car seats?|boosters?)\b", message, re.I):
+    if intent != "book_ride" and re.search(r"\b(child seat|car seats?|boosters?)\b", message, re.I):
         return _reply(conversation_id, "Sure! Child car seats and boosters are complimentary — no extra charge.")
+
+   
     
     if intent == "vehicle_information":
         return _reply(conversation_id, _vehicle_info())
@@ -706,6 +744,8 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
 
     if intent == "book_ride":
         session["stage"] = "collecting"
+        if CHILD_SEAT_REQUEST_RE.search(message):
+            session["slots"]["child_seat_requested"] = True
         captured = _merge_entities(session["slots"], entities)
         key, question = _next_missing(session["slots"])
         if key:

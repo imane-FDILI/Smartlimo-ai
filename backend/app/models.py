@@ -76,6 +76,7 @@ class Reservation(Base):
     pickup_time = Column(Time, nullable=False)
     passengers = Column(Integer, default=1)
     luggage = Column(Integer, default=0)
+    child_seat_requested = Column(Boolean, default=False)  # True si le client a demande un siege enfant pour cette course
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
     # `relationship` permet d'accéder directement à l'objet Vehicle complet
     # via `reservation.vehicle` (au lieu de juste son id), sans requête

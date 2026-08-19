@@ -75,3 +75,45 @@ The SmartLimo Team
         # on logue simplement l'erreur et on renvoie False.
         print(f"Email error: {e}")
         return False
+
+def send_admin_notification_email(reservation, user) -> bool:
+    """Envoie une notification a l'equipe (Bee Digital) des qu'une nouvelle
+    reservation est creee, pour verification manuelle avant l'envoi
+    eventuel d'un devis personnalise au client.
+    `reservation` est l'objet ORM Reservation, `user` l'objet ORM User
+    associe (pour recuperer nom/email/telephone du client)."""
+    admin_email = os.getenv("ADMIN_NOTIFICATION_EMAIL", SMTP_USER)
+    subject = f"New SmartLimo reservation #{reservation.id} - Review needed"
+    body = f"""A new reservation has just been submitted through SmartLimo AI.
+
+Client information:
+- Name: {user.name}
+- Email: {user.email}
+- Phone: {user.phone}
+
+Reservation details:
+- Reservation number: {reservation.id}
+- Pickup: {reservation.pickup_location}
+- Destination: {reservation.dropoff_location}
+- Date: {reservation.pickup_date}
+- Time: {reservation.pickup_time}
+- Passengers: {reservation.passengers}
+- Luggage: {reservation.luggage}
+- Vehicle: {reservation.vehicle.name if reservation.vehicle else "Not specified"}
+- Estimated price: ${reservation.price if reservation.price else "N/A"}
+- Child seat requested: {"Yes" if reservation.child_seat_requested else "No"}
+
+Please review and confirm availability before sending a personalized quote to the client.
+"""
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = SMTP_USER
+    msg["To"] = admin_email
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, admin_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"Failed to send admin notification email: {e}")
+        return False

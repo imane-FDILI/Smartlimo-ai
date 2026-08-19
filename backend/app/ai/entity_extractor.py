@@ -216,6 +216,15 @@ def extract_entities(text: str) -> dict:
         elif not slots["dropoff_location"]:
             slots["dropoff_location"] = canonical
 
+    if not slots["pickup_location"] or not slots["dropoff_location"]:
+        FROM_TO_RE = re.compile(r"\bfrom\s+(.+?)\s+to\s+(.+?)(?:\s+for\s|\s*,|\s*$)", re.I)
+        m = FROM_TO_RE.search(text)
+        if m:
+            if not slots["pickup_location"]:
+                slots["pickup_location"] = m.group(1).strip()
+            if not slots["dropoff_location"]:
+                slots["dropoff_location"] = m.group(2).strip()
+
     # --- 3. Déduction du service_type depuis les lieux (si non explicite)
     # Si l'utilisateur n'a pas dit explicitement le type de service
     # (ex: "airport transfer"), on essaie de le déduire de la catégorie
@@ -264,10 +273,11 @@ def extract_entities(text: str) -> dict:
     m = PASSENGERS_RE.search(text)
     if m:
         slots["passengers"] = _to_number(m.group(1))
+    elif re.search(r"\b(just me|only me|myself|solo|by myself)\b", text, re.I):
+        slots["passengers"] = 1
     m = LUGGAGE_RE.search(text)
     if m:
         slots["luggage"] = _to_number(m.group(1))
-
     return slots
 
 

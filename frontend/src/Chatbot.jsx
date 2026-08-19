@@ -4,7 +4,7 @@ import TripMap from "./TripMap";
 import { Check, Edit, Send } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-
+import { MapPin, Calendar, Clock, Users, Briefcase, Car, DollarSign, Baby } from "lucide-react";
 const API_URL = "http://127.0.0.1:8000";
 
 function Chatbot({ onClose }) {
@@ -27,7 +27,30 @@ function Chatbot({ onClose }) {
 
     return Date.now() - parseInt(savedTimestamp) > maxAgeMs;
   };
-
+  const renderSummary = (text) => {
+  const lines = text.split("\n").filter(l => l.startsWith("- "));
+  const iconMap = {
+    "Pickup": MapPin,
+    "Destination": MapPin,
+    "Date": Calendar,
+    "Time": Clock,
+    "Passengers": Users,
+    "Luggage": Briefcase,
+    "Vehicle": Car,
+    "Estimated price": DollarSign,
+    "Child seat": Baby,
+  };
+   return lines.map((line, i) => {
+    const [label, ...rest] = line.replace("- ", "").split(": ");
+    const value = rest.join(": ");
+    const Icon = iconMap[label] || MapPin;
+    return (
+      <div key={i} className="summary-line">
+        <Icon size={14} /> <strong>{label}:</strong> {value}
+      </div>
+    );
+  });
+};
   // Nettoyage de l'ancienne session
   if (isSessionExpired()) {
     localStorage.removeItem("smartlimo_conversation_id");
@@ -286,7 +309,14 @@ function Chatbot({ onClose }) {
             key={index}
             className={`message ${msg.sender}`}
           >
-            {msg.text}
+            {msg.sender === "bot" && msg.text.includes("Here is your reservation summary") ? (
+              <div>
+                {msg.text.split("\n")[0]}
+                {renderSummary(msg.text)}
+              </div>
+            ) : (
+              msg.text.replace(/Available options: .+\n?/, "")
+            )}
 
             {/* MAP */}
             {msg.tripInfo && (
@@ -331,28 +361,22 @@ function Chatbot({ onClose }) {
         {/* VEHICLE BUTTONS */}
         {showVehicleButtons && (
           <div className="vehicle-buttons">
-
-            {[
-              "Sedan",
-              "Executive SUV",
-              "Premium SUV",
-              "Transit VAN",
-              "Sprinter VAN",
-            ].map((vehicle) => (
-              <button
-                key={vehicle}
-                className="vehicle-btn"
-                onClick={() =>
-                  handleVehicleClick(vehicle)
-                }
-              >
-                {vehicle}
-              </button>
-            ))}
-
+            {(() => {
+              const lastBotMessage = messages.filter(m => m.sender === "bot").slice(-1)[0];
+              const match = lastBotMessage?.text.match(/Available options: (.+)/);
+              const options = match ? match[1].split(", ") : ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"];
+              return options.map((vehicle) => (
+                <button
+                  key={vehicle}
+                  className="vehicle-btn"
+                  onClick={() => handleVehicleClick(vehicle)}
+                >
+                  {vehicle}
+                </button>
+              ));
+            })()}
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 

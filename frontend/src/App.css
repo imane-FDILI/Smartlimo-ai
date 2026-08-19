@@ -402,3 +402,9 @@ body {
     opacity: 1;
   }
 }
+.summary-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}

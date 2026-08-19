@@ -28,12 +28,14 @@ def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool
     now = datetime.now()
     return pickup_datetime - now >= timedelta(hours=min_hours)
 
-US_HOLIDAYS_2026 = [
-    dt.date(2026, 1, 1),   # New Year
-    dt.date(2026, 7, 4),   # Independence Day
-    dt.date(2026, 12, 25), # Christmas
-    # liste non exhaustive - a completer si besoin
-]
+import holidays as holidays_lib
+
+
+def is_us_holiday(check_date) -> bool:
+    """Verifie si une date est un jour ferie federal americain,
+    pour n'importe quelle annee (calcul dynamique, pas de liste figee)."""
+    us_holidays = holidays_lib.UnitedStates(years=check_date.year)
+    return check_date in us_holidays
 
 def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
     """Verifie que la reservation est faite au moins min_hours avant le depart."""
@@ -62,7 +64,7 @@ def apply_surcharges(db: Session, base_price: float, pickup_time, pickup_date, p
 
     # Supplement jour ferie (deja fait)
     holiday = db.query(Surcharge).filter(Surcharge.code == "HOLIDAY_SURCHARGE").first()
-    if holiday and pickup_date is not None and pickup_date in US_HOLIDAYS_2026:
+    if holiday and pickup_date is not None and is_us_holiday(pickup_date):
         total += total * (holiday.percent / 100)
 
     # NOUVEAU : frais aeroport (si pickup = MCO ou SFB)
@@ -158,9 +160,11 @@ def create_reservation(db: Session, slots: dict) -> Reservation:
         # explicitement `is not None` pour luggage car 0 est une valeur
         # valide qui ne doit pas être remplacée par une valeur par défaut.
         luggage=slots.get("luggage") if slots.get("luggage") is not None else 0,
+        child_seat_requested=slots.get("child_seat_requested", False),
         status="confirmed",
         price=slots.get("estimated_price"),
     )
+    
     db.add(reservation)
     db.commit()
     db.refresh(reservation)  # récupère l'id généré et les valeurs par défaut serveur
