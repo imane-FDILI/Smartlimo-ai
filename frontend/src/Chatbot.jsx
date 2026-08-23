@@ -4,8 +4,8 @@ import TripMap from "./TripMap";
 import { Check, Edit, X, Send, MapPin, Calendar, Clock, Users, Briefcase, Car, DollarSign, Baby } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-const API_URL = "http://127.0.0.1:8000";
 
 function Chatbot({ onClose }) {
   const [input, setInput] = useState("");
