@@ -9,7 +9,9 @@ Combine 3 approches :
 import json
 import re
 from difflib import get_close_matches
+
 from pathlib import Path
+ENTITIES_PATH = Path(__file__).resolve().parent.parent.parent / "datasets" / "entities.json"
 
 import spacy
 from spacy.matcher import PhraseMatcher
@@ -20,7 +22,7 @@ from spacy.util import filter_spans
 # afin de pouvoir localiser le dossier "datasets" qui se trouve au même
 # niveau que "backend" dans l'arborescence du projet.
 BASE_DIR = Path(__file__).resolve().parents[2]  # backend/
-ENTITIES_PATH = BASE_DIR.parent / "datasets" / "entities.json"
+
 
 # Modèle spaCy anglais "petit" : suffisant pour détecter dates/heures (DATE, TIME)
 # sans avoir besoin d'un modèle plus lourd.
