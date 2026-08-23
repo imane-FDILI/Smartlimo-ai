@@ -1,0 +1,422 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", sans-serif;
+}
+
+/* Page : texte centré */
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0d0d0d 0%, #1c1c24 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.intro {
+  text-align: center;
+  max-width: 560px;
+}
+
+.title {
+  color: #d4af37;
+  font-size: 36px;
+  margin-bottom: 16px;
+}
+
+.subtitle {
+  color: #b5b5b5;
+  font-size: 17px;
+  line-height: 1.6;
+  justify-content: center;
+}
+
+/* ---------- Pilule flottante ---------- */
+.chat-launcher {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  border-radius: 999px;
+  background: white;
+  cursor: pointer;
+  padding: 6px 18px 6px 6px;
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.45);
+  transition: transform 0.2s;
+  padding: 6px 18px 6px 12px;    /* plus d'air à gauche */
+  overflow: hidden;               /* rien ne depasse de la pilule */
+}
+
+.chat-launcher:hover {
+  transform: scale(1.05);
+}
+
+.launcher-van {
+  height: 44px;                   /* un peu plus petit */
+  width: auto;
+}
+
+.launcher-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.launcher-question {
+  font-size: 13px;
+  color: #14141c;
+  font-weight: 600;
+}
+
+.launcher-cta {
+  font-size: 12px;
+  color: #d4af37;
+  font-weight: 700;
+}
+/* ---------- Fenêtre du chatbot ---------- */
+.chatbot {
+  position: fixed;
+  bottom: 105px;
+  right: 30px;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  height: 540px;
+  background: #ffffff;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 45px rgba(0, 0, 0, 0.45);
+  z-index: 999;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.chatbot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 16px;
+  background: #14141c;
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.chatbot-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f6f6f8;
+}
+
+.message {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.message.bot {
+  background: #e9e9ef;
+  color: #222;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  white-space: pre-line;
+}
+
+.message.user {
+  background: #c9a227;
+  color: #14141c;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.chatbot-input {
+  display: flex;
+  padding: 12px;
+  gap: 8px;
+  background: #ffffff;
+  border-top: 1px solid #eee;
+}
+
+.chatbot-input input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  outline: none;
+  font-size: 14px;
+  background: #ffffff;
+  color: #222;
+}
+
+.chatbot-input input:focus {
+  border-color: #d4af37;
+}
+
+.send-button {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: #14141c;
+  color: white;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.2s ease;
+}
+
+.send-button:hover {
+  background: #d4af37;
+  color: #14141c;
+  transform: scale(1.08);
+}
+
+.send-button:active {
+  transform: scale(0.95);
+}
+.vehicle-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.vehicle-btn {
+  background: #ffffff;
+  border: 1.5px solid #c9a227;
+  color: #1a1a1a;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vehicle-btn:hover {
+  background: #c9a227;
+  color: white;
+}
+/* ===== TripMap - style Apple Plans ===== */
+.trip-map {
+  margin: 8px 0 14px 0;
+}
+
+.trip-map .leaflet-container {
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.trip-info {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: -20px auto 0 auto;
+  width: fit-content;
+  position: relative;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.trip-sep {
+  color: #c9a227;
+}
+.confirm-buttons {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.confirm-btn-yes {
+  background: #c9a227;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirm-btn-no {
+  background: transparent;
+  border: 1.5px solid #666;
+  color: #666;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm-btn-yes, .confirm-btn-no {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.trip-info-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* ===== Personnalisation du calendrier (react-datepicker) ===== */
+.date-picker-container {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+}
+
+.react-datepicker {
+  font-family: inherit;
+  border: 1px solid #c9a227;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.react-datepicker__header {
+  background-color: #1a1a1a;
+  border-bottom: none;
+  padding-top: 12px;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: #c9a227;
+  font-weight: 600;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #c9a227;
+}
+
+.react-datepicker__day {
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.react-datepicker__day:hover {
+  background-color: #c9a22730;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #c9a227;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.react-datepicker__day--disabled {
+  color: #cccccc;
+}
+
+.react-datepicker__day--today {
+  font-weight: 700;
+  color: #c9a227;
+}
+/* ---------- Typing indicator ---------- */
+
+.typing-indicator {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: #e9e9ef;
+  color: #555;
+
+  padding: 10px 14px;
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+
+  font-size: 12px;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  background: #d4af37;
+  border-radius: 50%;
+
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+.summary-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.confirm-btn-cancel {
+  background: transparent;
+  border: 1.5px solid #000000;
+  color: #02020285;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -1,0 +1,639 @@
+{
+  "airports": [
+    {
+      "name": "Orlando International Airport",
+      "aliases": [
+        "MCO",
+        "Orlando Airport",
+        "Orlando Intl",
+        "OIA"
+      ]
+    },
+    {
+      "name": "Orlando Sanford International Airport",
+      "aliases": [
+        "Sanford Airport",
+        "SFB",
+        "Sanford"
+      ]
+    },
+    {
+      "name": "Tampa International Airport",
+      "aliases": [
+        "TPA",
+        "Tampa Airport"
+      ]
+    },
+    {
+      "name": "Miami International Airport",
+      "aliases": [
+        "MIA",
+        "Miami Airport"
+      ]
+    },
+    {
+      "name": "Daytona Beach International Airport",
+      "aliases": [
+        "DAB",
+        "Daytona Airport"
+      ]
+    },
+    {
+      "name": "Orlando Executive Airport",
+      "aliases": [
+        "ORL",
+        "Executive Airport"
+      ]
+    },
+    {
+      "name": "Kissimmee Gateway Airport",
+      "aliases": [
+        "ISM",
+        "Kissimmee Airport"
+      ]
+    }
+  ],
+  "ports": [
+    {
+      "name": "Port Canaveral",
+      "aliases": [
+        "Canaveral",
+        "the cruise port",
+        "cruise terminal",
+        "Cape Canaveral port"
+      ]
+    },
+    {
+      "name": "Port of Tampa",
+      "aliases": [
+        "Tampa cruise port",
+        "Tampa port"
+      ]
+    },
+    {
+      "name": "Port of Miami",
+      "aliases": [
+        "Miami cruise port",
+        "Miami port",
+        "PortMiami"
+      ]
+    }
+  ],
+  "theme_parks": [
+    {
+      "name": "Walt Disney World",
+      "aliases": [
+        "Disney World",
+        "Disney",
+        "WDW"
+      ]
+    },
+    {
+      "name": "Magic Kingdom",
+      "aliases": []
+    },
+    {
+      "name": "EPCOT",
+      "aliases": [
+        "Epcot Center"
+      ]
+    },
+    {
+      "name": "Disney's Hollywood Studios",
+      "aliases": [
+        "Hollywood Studios"
+      ]
+    },
+    {
+      "name": "Disney's Animal Kingdom",
+      "aliases": [
+        "Animal Kingdom"
+      ]
+    },
+    {
+      "name": "Universal Studios Florida",
+      "aliases": [
+        "Universal Studios",
+        "Universal"
+      ]
+    },
+    {
+      "name": "Islands of Adventure",
+      "aliases": [
+        "IOA"
+      ]
+    },
+    {
+      "name": "Universal Epic Universe",
+      "aliases": [
+        "Epic Universe"
+      ]
+    },
+    {
+      "name": "Volcano Bay",
+      "aliases": []
+    },
+    {
+      "name": "SeaWorld Orlando",
+      "aliases": [
+        "SeaWorld"
+      ]
+    },
+    {
+      "name": "Aquatica",
+      "aliases": []
+    },
+    {
+      "name": "LEGOLAND Florida",
+      "aliases": [
+        "Legoland"
+      ]
+    },
+    {
+      "name": "Busch Gardens Tampa",
+      "aliases": [
+        "Busch Gardens"
+      ]
+    },
+    {
+      "name": "Gatorland",
+      "aliases": []
+    },
+    {
+      "name": "Kennedy Space Center",
+      "aliases": [
+        "KSC"
+      ]
+    }
+  ],
+  "hotels": [
+    {
+      "name": "Disney's Grand Floridian Resort",
+      "aliases": [
+        "Grand Floridian"
+      ]
+    },
+    {
+      "name": "Disney's Contemporary Resort",
+      "aliases": [
+        "Contemporary Resort"
+      ]
+    },
+    {
+      "name": "Disney's Polynesian Village Resort",
+      "aliases": [
+        "Polynesian"
+      ]
+    },
+    {
+      "name": "Hilton Orlando",
+      "aliases": []
+    },
+    {
+      "name": "Hyatt Regency Orlando",
+      "aliases": [
+        "Hyatt Orlando"
+      ]
+    },
+    {
+      "name": "Rosen Plaza Hotel",
+      "aliases": [
+        "Rosen Plaza"
+      ]
+    },
+    {
+      "name": "Rosen Centre Hotel",
+      "aliases": [
+        "Rosen Centre"
+      ]
+    },
+    {
+      "name": "Marriott Orlando World Center",
+      "aliases": [
+        "World Center Marriott"
+      ]
+    },
+    {
+      "name": "Marriott Orlando Airport Lakeside",
+      "aliases": [
+        "Marriott Orlando Airport"
+      ]
+    },
+    {
+      "name": "Waldorf Astoria Orlando",
+      "aliases": [
+        "Waldorf Astoria"
+      ]
+    },
+    {
+      "name": "Four Seasons Resort Orlando",
+      "aliases": [
+        "Four Seasons Orlando"
+      ]
+    },
+    {
+      "name": "The Ritz-Carlton Orlando",
+      "aliases": [
+        "Ritz-Carlton",
+        "Ritz Carlton Orlando"
+      ]
+    },
+    {
+      "name": "JW Marriott Orlando",
+      "aliases": []
+    },
+    {
+      "name": "Loews Royal Pacific Resort",
+      "aliases": [
+        "Royal Pacific"
+      ]
+    },
+    {
+      "name": "Hard Rock Hotel Orlando",
+      "aliases": [
+        "Hard Rock Hotel"
+      ]
+    },
+    {
+      "name": "Universal's Cabana Bay Beach Resort",
+      "aliases": [
+        "Cabana Bay"
+      ]
+    },
+    {
+      "name": "Gaylord Palms Resort",
+      "aliases": [
+        "Gaylord Palms"
+      ]
+    },
+    {
+      "name": "Caribe Royale Orlando",
+      "aliases": [
+        "Caribe Royale"
+      ]
+    },
+    {
+      "name": "Omni Orlando Resort",
+      "aliases": [
+        "Omni Orlando"
+      ]
+    },
+    {
+      "name": "Grand Bohemian Hotel Orlando",
+      "aliases": [
+        "Grand Bohemian"
+      ]
+    }
+  ],
+  "places": [
+    {
+      "name": "Orange County Convention Center",
+      "aliases": [
+        "OCCC",
+        "the convention center"
+      ]
+    },
+    {
+      "name": "International Drive",
+      "aliases": [
+        "I-Drive"
+      ]
+    },
+    {
+      "name": "Downtown Orlando",
+      "aliases": [
+        "downtown"
+      ]
+    },
+    {
+      "name": "Lake Buena Vista",
+      "aliases": []
+    },
+    {
+      "name": "Kissimmee",
+      "aliases": []
+    },
+    {
+      "name": "Celebration",
+      "aliases": []
+    },
+    {
+      "name": "Winter Park",
+      "aliases": []
+    },
+    {
+      "name": "Sanford",
+      "aliases": []
+    },
+    {
+      "name": "Daytona Beach",
+      "aliases": []
+    },
+    {
+      "name": "Cocoa Beach",
+      "aliases": []
+    },
+    {
+      "name": "Tampa",
+      "aliases": []
+    },
+    {
+      "name": "Miami",
+      "aliases": []
+    },
+    {
+      "name": "Clearwater",
+      "aliases": []
+    },
+    {
+      "name": "St. Petersburg",
+      "aliases": [
+        "St Pete"
+      ]
+    },
+    {
+      "name": "Camping World Stadium",
+      "aliases": []
+    },
+    {
+      "name": "Kia Center",
+      "aliases": [
+        "Amway Center"
+      ]
+    },
+    {
+      "name": "Disney Springs",
+      "aliases": []
+    },
+    {
+      "name": "Universal CityWalk",
+      "aliases": [
+        "CityWalk"
+      ]
+    },
+    {
+      "name": "The Mall at Millenia",
+      "aliases": [
+        "Millenia Mall"
+      ]
+    },
+    {
+      "name": "Orlando Premium Outlets",
+      "aliases": [
+        "Premium Outlets"
+      ]
+    }
+  ],
+  "vehicle_types": [
+    {
+      "name": "Sedan",
+      "aliases": [
+        "luxury sedan",
+        "town car",
+        "executive sedan",
+        "car"
+      ],
+      "capacity": 3,
+      "luggage": 3
+    },
+    {
+      "name": "Executive SUV",
+      "aliases": [
+        "SUV",
+        "Suburban",
+        "Chevy Suburban",
+        "Yukon",
+        "executive suv"
+      ],
+      "capacity": 6,
+      "luggage": 6
+    },
+    {
+      "name": "Premium SUV",
+      "aliases": [
+        "Escalade",
+        "Cadillac Escalade",
+        "premium suv",
+        "luxury SUV"
+      ],
+      "capacity": 6,
+      "luggage": 8
+    },
+    {
+      "name": "Transit VAN",
+      "aliases": [
+        "Transit",
+        "Ford Transit",
+        "transit van",
+        "van",
+        "shuttle van"
+      ],
+      "capacity": 14,
+      "luggage": 14
+    },
+    {
+      "name": "Sprinter VAN",
+      "aliases": [
+        "Sprinter",
+        "Mercedes Sprinter",
+        "sprinter van",
+        "luxury van",
+        "executive van"
+      ],
+      "capacity": 11,
+      "luggage": 12
+    }
+  ],
+  "service_types": [
+    {
+      "name": "from_airport",
+      "aliases": [
+        "from the airport",
+        "airport pickup",
+        "arriving at",
+        "landing at",
+        "airport arrival"
+      ]
+    },
+    {
+      "name": "to_airport",
+      "aliases": [
+        "to the airport",
+        "airport drop-off",
+        "catch a flight",
+        "flying out",
+        "departure"
+      ]
+    },
+    {
+      "name": "point_to_point",
+      "aliases": [
+        "point to point",
+        "one way",
+        "direct transfer",
+        "A to B"
+      ]
+    },
+    {
+      "name": "hourly",
+      "aliases": [
+        "by the hour",
+        "per hour",
+        "hourly service",
+        "at my disposal",
+        "as directed"
+      ]
+    },
+    {
+      "name": "from_port",
+      "aliases": [
+        "from the port",
+        "cruise pickup",
+        "after our cruise",
+        "port pickup",
+        "disembarking"
+      ]
+    },
+    {
+      "name": "to_port",
+      "aliases": [
+        "to the port",
+        "cruise drop-off",
+        "to the cruise terminal",
+        "embarking",
+        "catch a cruise"
+      ]
+    }
+  ],
+  "occasions": [
+    {
+      "name": "wedding",
+      "aliases": [
+        "getting married",
+        "bridal party"
+      ]
+    },
+    {
+      "name": "prom",
+      "aliases": [
+        "prom night",
+        "homecoming"
+      ]
+    },
+    {
+      "name": "birthday",
+      "aliases": [
+        "birthday party",
+        "bday"
+      ]
+    },
+    {
+      "name": "business",
+      "aliases": [
+        "business meeting",
+        "corporate",
+        "conference",
+        "work trip",
+        "business travel"
+      ]
+    },
+    {
+      "name": "night_out",
+      "aliases": [
+        "night on the town",
+        "bar hopping",
+        "clubbing",
+        "bachelor party",
+        "bachelorette party"
+      ]
+    },
+    {
+      "name": "airport_transfer",
+      "aliases": [
+        "flight",
+        "arrival",
+        "departure"
+      ]
+    },
+    {
+      "name": "cruise_transfer",
+      "aliases": [
+        "cruise",
+        "sailing"
+      ]
+    },
+    {
+      "name": "anniversary",
+      "aliases": []
+    },
+    {
+      "name": "graduation",
+      "aliases": []
+    },
+    {
+      "name": "concert",
+      "aliases": [
+        "show",
+        "game",
+        "sports event"
+      ]
+    },
+    {
+      "name": "quinceanera",
+      "aliases": [
+        "quince"
+      ]
+    },
+    {
+      "name": "funeral",
+      "aliases": [
+        "memorial service"
+      ]
+    }
+  ],
+  "extras": [
+    {
+      "name": "child_seat",
+      "aliases": [
+        "child seat",
+        "baby seat",
+        "booster seat",
+        "car seat",
+        "infant seat"
+      ]
+    },
+    {
+      "name": "accessible",
+      "aliases": [
+        "wheelchair accessible",
+        "wheelchair",
+        "handicap accessible",
+        "ADA"
+      ]
+    },
+    {
+      "name": "extra_stop",
+      "aliases": [
+        "add a stop",
+        "additional stop",
+        "make a stop"
+      ]
+    },
+    {
+      "name": "meet_and_greet",
+      "aliases": [
+        "meet and greet",
+        "sign with my name",
+        "inside pickup"
+      ]
+    },
+    {
+      "name": "champagne",
+      "aliases": [
+        "drinks",
+        "refreshments",
+        "champagne service"
+      ]
+    }
+  ]
+}

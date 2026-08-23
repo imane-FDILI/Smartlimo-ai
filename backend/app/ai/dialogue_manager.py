@@ -1,0 +1,807 @@
+"""
+SmartLimo AI - Gestionnaire de dialogue (dialogue manager)
+
+Ce module est le "cerveau" du chatbot : il reçoit un message utilisateur,
+détecte son intention (via intent_classifier) et les entités qu'il contient
+(via entity_extractor), puis décide de la réponse à donner en fonction de
+l'état de la conversation (session).
+
+La conversation est modélisée comme une petite machine à états :
+  - "idle"       : aucune réservation en cours
+  - "collecting" : on est en train de collecter les informations (slots)
+                   nécessaires à la réservation (lieu, date, véhicule...)
+  - "confirming" : tous les slots sont remplis, on attend la confirmation
+                   finale de l'utilisateur avant de créer la réservation
+  - "completed"  : la réservation a été créée
+
+En plus de ce flux principal de réservation, le module gère aussi des
+sous-dialogues plus courts (demande de prix, historique des trajets,
+modification/annulation de réservation, etc.) via le champ `expected`
+qui indique quelle information précise on attend dans le prochain message.
+"""
+
+import re
+import uuid
+
+from app.ai.intent_classifier import predict_intent
+from app.ai.entity_extractor import extract_entities
+
+SESSIONS = {}
+
+REQUIRED_SLOTS = [
+    ("pickup_location", "Where would you like to be picked up?"),
+    ("dropoff_location", "What is your destination?"),
+    ("date", "What date would you like to travel?"),
+    ("time", "What time would you like to be picked up?"),
+    ("passengers", "How many passengers will be traveling?"),
+    ("luggage", "How many pieces of luggage will you have?"),
+    ("vehicle", "What type of vehicle would you prefer? "),
+    ("name", "Great! May I have your full name?"),
+    ("phone", "Could you provide your phone number?"),
+    ("email", "And your email address?"),
+]
+
+SLOT_LABELS = {
+    "pickup_location": "Pickup", "dropoff_location": "Destination",
+    "date": "Date", "time": "Time", "passengers": "Passengers",
+    "luggage": "Luggage", "vehicle": "Vehicle", "name": "Name",
+    "phone": "Phone", "email": "Email",
+}
+
+EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+PHONE_RE = re.compile(r"\+?\d[\d\s().-]{8,}\d")
+NUM_RE = re.compile(r"\d+")
+NO_PREF_RE = re.compile(r"no preference|any|whatever|doesn'?t matter", re.I)
+ACCEPT_RECO_RE = re.compile(r"\b(yes|sure|ok|okay|sounds good|your recommendation|that one|the one you suggested|agree)\b", re.I)
+NONE_RE = re.compile(r"\b(none|no|zero|nothing)\b", re.I)
+RESERVATION_NUM_RE = re.compile(r"#?(\d+)")
+CHILD_SEAT_REQUEST_RE = re.compile(r"\b(need|want|add|include|with)\s+.*(child seat|booster)", re.I)
+
+# Mots-clés reconnus pour identifier quel slot l'utilisateur veut modifier
+# après avoir refusé (deny) le résumé de réservation (voir "edit_field"
+# dans handle_message). Recherche par mot entier (\b), premier match gagne.
+EDIT_FIELD_KEYWORDS = {
+    "pickup_location": ["pickup", "pick up", "pick-up"],
+    "dropoff_location": ["destination", "dropoff", "drop off", "drop-off"],
+    "date": ["date"],
+    "time": ["time"],
+    "passengers": ["passenger", "passengers"],
+    "luggage": ["luggage", "bag", "bags"],
+    "vehicle": ["vehicle", "car"],
+    "name": ["name"],
+    "phone": ["phone", "number"],
+    "email": ["email"],
+}
+
+INTENT_RESPONSES = {
+    "greeting": "Hello! Welcome to SmartLimo AI. I can help you book a limousine, get a price estimate, or track your driver. How can I help you today?",
+    "cancel_booking": "I can help you cancel your reservation. Could you give me your booking details?",
+    "modify_booking": "Sure, let's update your reservation. What would you like to change?",
+    "driver_tracking": "Let me check your driver's location. Could you give me your booking reference?",
+    "trip_history": "Here's where I'd show your past rides. (Coming soon!)",
+    "payment": "We accept credit cards, cash, and online payments. What would you like to know?",
+    "tip": "You can add a tip for your driver at any time. Would you like to add one?",
+    "pricing": "I can give you a price estimate. Where are you traveling from and to?",
+    "vehicle_information": "Our fleet includes Sedans, Executive SUVs, Premium SUVs, Transit VANs and Sprinter VANs. What would you like to know?",
+    "help": "I can help you: book a ride, get a price, track your driver, or manage your reservations. Just tell me what you need!",
+    "thanks": "You're very welcome! Anything else I can do for you?",
+    "goodbye": "Thank you for choosing SmartLimo! Have a wonderful day!",
+    "unknown": "I'm sorry, I didn't quite understand that. I can help you book a ride, get a price, or track your driver.",
+}
+def _looks_like_phone(text: str) -> bool:
+    """Verifie qu'un texte matché par PHONE_RE contient assez de VRAIS
+    chiffres (pas juste des espaces) pour etre un telephone plausible."""
+    digits = re.sub(r"[^\d]", "", text)
+    return len(digits) >= 9  # un numero de telephone US a au moins 10 chiffres avec indicatif
+
+
+def _new_session():
+    return {"slots": {}, "stage": "idle", "expected": None, "reservation_id": None}
+
+
+def _merge_entities(slots: dict, entities: dict):
+    captured = []
+    for key in ("pickup_location", "dropoff_location", "date", "time",
+                "passengers", "luggage", "vehicle", "service_type", "occasion"):
+        if entities.get(key) not in (None, []) and not slots.get(key):
+            value = entities[key]
+            if key == "passengers":
+                try:
+                    if int(value) > 14:
+                        continue
+                except (ValueError, TypeError):
+                    pass
+            slots[key] = value
+            if key in SLOT_LABELS:
+                captured.append(key)
+    if entities.get("extras"):
+        slots.setdefault("extras", [])
+        for e in entities["extras"]:
+            if e not in slots["extras"]:
+                slots["extras"].append(e)
+    return captured
+
+def _scan_contact_info(slots: dict, message: str):
+    if not slots.get("email"):
+        m = EMAIL_RE.search(message)
+        if m:
+            slots["email"] = m.group()
+    if not slots.get("phone"):
+        m = PHONE_RE.search(message)
+        if m:
+            slots["phone"] = m.group()
+
+    if not slots.get("phone"):
+        m = PHONE_RE.search(message)
+        if m and _looks_like_phone(m.group()):
+            slots["phone"] = m.group()
+
+
+def _format_name(raw: str) -> str:
+    parts = raw.strip().split()
+    if len(parts) < 2:
+        return raw.strip().capitalize()
+    first = parts[0].capitalize()
+    last = " ".join(p.upper() for p in parts[1:])
+    return f"{first} {last}"
+
+
+def _fill_expected(slots: dict, expected: str, message: str) -> bool:
+    text = message.strip().strip(".")
+    if not expected or slots.get(expected):
+        return False
+    if expected in ("passengers", "luggage"):
+        if NONE_RE.search(text):
+            slots[expected] = 0
+            return True
+        m = NUM_RE.search(text)
+        if m:
+            value = int(m.group())
+            if expected == "passengers" and value > 14:
+                return False
+            slots[expected] = value
+            return True
+    elif expected == "vehicle":
+        VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
+        for name in VEHICLE_NAMES:
+            if name.lower() in text.lower():
+                slots[expected] = name
+                return True
+        return False
+    elif expected == "phone":
+        m = PHONE_RE.search(text)
+        if m:
+            slots[expected] = m.group()
+            return True
+    elif expected == "email":
+        m = EMAIL_RE.search(text)
+        if m:
+            slots[expected] = m.group()
+            return True
+    elif expected == "time":
+        from app.services.reservation_service import parse_time, is_time_unambiguous
+        if not is_time_unambiguous(text):
+            return False
+        parsed = parse_time(text)
+        if parsed is not None:
+            slots[expected] = text
+            return True
+        return False
+    elif expected in ("pickup_location", "dropoff_location"):
+        from app.services.geo_service import geocode
+        if geocode(text) is None:
+            return False
+        slots[expected] = text
+        return True
+    elif expected == "date":
+        from app.services.reservation_service import parse_date
+        from datetime import date as date_type
+        parsed = parse_date(text)
+        if parsed < date_type.today():
+            return False
+        slots[expected] = text
+        return True
+    elif expected == "name":
+        cleaned = EMAIL_RE.sub("", text)
+        cleaned = PHONE_RE.sub("", cleaned)
+        cleaned = re.sub(r"\b(name|phone|email)\s*:?\s*", "", cleaned, flags=re.I)
+        cleaned = re.sub(r"[-:]", " ", cleaned).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        if len(cleaned) >= 2:
+            slots[expected] = _format_name(cleaned)
+            return True
+    return False
+
+def _next_missing(slots: dict):
+    for key, question in REQUIRED_SLOTS:
+        if slots.get(key) is None:
+            return key, question
+    return None, None
+
+
+def _summary(slots: dict) -> str:
+    lines = ["Perfect! Here is your reservation summary:", ""]
+    for key, _ in REQUIRED_SLOTS:
+        if slots.get(key) or slots.get(key) == 0:
+            value = slots[key]
+            if key == "date":
+                from app.services.reservation_service import parse_date
+                parsed_date = parse_date(str(value))
+                value = parsed_date.strftime("%B %d, %Y")
+            elif key == "time":
+                from app.services.reservation_service import parse_time
+                parsed_time = parse_time(str(value))
+                if parsed_time:
+                    value = parsed_time.strftime("%I:%M %p").lstrip("0")
+            lines.append(f"- {SLOT_LABELS[key]}: {value}")
+    if slots.get("extras"):
+        lines.append(f"- Extras: {', '.join(slots['extras'])}")
+    if slots.get("child_seat_requested"):
+        lines.append("- Child seat: Requested (your driver will have it ready)")
+    if slots.get("estimated_price"):
+        lines.append(f"- Estimated price: ${slots['estimated_price']}")
+    lines += [
+        "",
+        "Good to know: child seats and boosters are complimentary. A night "
+        "surcharge ($20) applies between midnight and 5am, and holiday dates "
+        "carry a 20% surcharge. Gratuity is not included automatically.",
+        "",
+        "Would you like to confirm your reservation?"
+    ]
+    return "\n".join(lines)
+
+def _acknowledge(captured: list, slots: dict) -> str:
+    if len(captured) < 2:
+        return ""
+    items = ", ".join(f"{slots[k]}" for k in captured)
+    return f"Got it: {items}.\n"
+
+def _format_history(reservations) -> str:
+    if not reservations:
+        return "I couldn't find any reservations for this email. Would you like to book a ride?"
+    lines = [f"You have {len(reservations)} reservation(s):", ""]
+    for r in reservations:
+        lines.append(f"#{r.id} - {r.pickup_location} to {r.dropoff_location} on {r.pickup_date} at {r.pickup_time} - {r.status}")
+    return "\n".join(lines)
+
+
+def _lookup_history(email: str) -> str:
+    from app.database import SessionLocal
+    from app.services.reservation_service import get_user_reservations
+    db = SessionLocal()
+    try:
+        reservations = get_user_reservations(db, email)
+    finally:
+        db.close()
+    return _format_history(reservations)
+
+
+def _compute_price(slots: dict):
+    from app.database import SessionLocal
+    from app.services.reservation_service import estimate_price_by_zone, apply_surcharges, parse_date, parse_time
+    db = SessionLocal()
+    try:
+        price = estimate_price_by_zone(db, slots.get("pickup_location", ""), slots.get("dropoff_location", ""), slots.get("vehicle"))
+        if price is not None:
+            pickup_time = parse_time(str(slots.get("time", "")))
+            pickup_date = parse_date(str(slots.get("date", "")))
+            price = apply_surcharges(db, price, pickup_time, pickup_date,
+                          slots.get("pickup_location", ""),
+                          slots.get("dropoff_location", ""))
+            slots["estimated_price"] = price
+    finally:
+        db.close()
+
+
+def _price_quote(pickup: str, dropoff: str, vehicle: str) -> str:
+    from app.database import SessionLocal
+    from app.services.reservation_service import estimate_price_by_zone
+
+    db = SessionLocal()
+    try:
+        price = estimate_price_by_zone(db, pickup, dropoff, vehicle)
+    finally:
+        db.close()
+
+    if price is None:
+        return "Sorry, I don't have a fixed rate for this route. Please contact us for a custom quote."
+
+    return f"A {vehicle} from {pickup} to {dropoff} would cost ${price}."
+
+
+def _vehicle_info() -> str:
+    from app.database import SessionLocal
+    from app.models import Vehicle
+    db = SessionLocal()
+    try:
+        vehicles = db.query(Vehicle).order_by(Vehicle.capacity).all()
+    finally:
+        db.close()
+    lines = ["Here is our fleet:", ""]
+    for v in vehicles:
+        lines.append(f"- {v.name}: up to {v.capacity} passenger(s), {v.luggage} bag(s)")
+    lines.append("")
+    lines.append("Which one would you like to know more about, or are you ready to book?")
+    return "\n".join(lines)
+
+
+def _vehicle_prefix(slots: dict) -> str:
+    from app.database import SessionLocal
+    from app.services.reservation_service import recommend_vehicle, get_eligible_vehicles
+    db = SessionLocal()
+    try:
+        v = recommend_vehicle(db, slots.get("passengers") or 1, slots.get("luggage") or 0)
+        eligible = get_eligible_vehicles(db, slots.get("passengers") or 1, slots.get("luggage") or 0)
+    finally:
+        db.close()
+    prefix = ""
+    if v:
+        slots["_recommended_vehicle"] = v.name
+        prefix = f"Based on {slots.get('passengers')} passenger(s) and {slots.get('luggage')} bag(s), I recommend the {v.name}.\n"
+    if eligible:
+        prefix += f"Available options: {', '.join(eligible)}\n"
+    return prefix
+
+def _apply_modification(session: dict, entities: dict, message: str = "") -> str | None:
+    FIELD_MAP = [
+        ("time", "pickup_time", "time"),
+        ("date", "pickup_date", "date"),
+        ("pickup_location", "pickup_location", None),
+        ("dropoff_location", "dropoff_location", None),
+        ("passengers", "passengers", None),
+        ("luggage", "luggage", None),
+    ]
+
+    from app.database import SessionLocal
+    from app.services.reservation_service import update_reservation, parse_date, parse_time
+
+    # NOUVEAU : detecter explicitement le champ cible par mot-cle dans le message
+    message_lower = message.lower()
+    target_field = None
+    if "destination" in message_lower or "dropoff" in message_lower:
+        target_field = "dropoff_location"
+    elif "pickup" in message_lower and "location" in message_lower:
+        target_field = "pickup_location"
+    elif re.search(r"\bpickup\b", message_lower) and "destination" not in message_lower:
+        target_field = "pickup_location"
+    elif "vehicle" in message_lower or ("car" in message_lower and "seat" not in message_lower):
+        from app.models import Vehicle
+        VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
+        matched_vehicle = None
+        for name in VEHICLE_NAMES:
+            if name.lower() in message_lower:
+                matched_vehicle = name
+                break
+        if matched_vehicle:
+            db = SessionLocal()
+            try:
+                vehicle = db.query(Vehicle).filter(Vehicle.name == matched_vehicle).first()
+                if vehicle:
+                    ok = update_reservation(db, session["reservation_id"], "vehicle_id", vehicle.id)
+                else:
+                    ok = False
+            finally:
+                db.close()
+            if ok:
+                return f"Done! Your vehicle has been updated to {matched_vehicle}."
+            return "Sorry, I couldn't find that reservation."
+    if target_field:
+        value = entities.get(target_field) or entities.get("pickup_location") or entities.get("dropoff_location")
+        if value:
+            db = SessionLocal()
+            try:
+                ok = update_reservation(db, session["reservation_id"], target_field, value)
+            finally:
+                db.close()
+            if ok:
+                from app.models import Reservation
+                db2 = SessionLocal()
+                try:
+                    updated_res = db2.get(Reservation, session["reservation_id"])
+                    summary = (
+                        f"\n\nHere is your updated reservation summary:\n"
+                        f"- Pickup: {updated_res.pickup_location}\n"
+                        f"- Destination: {updated_res.dropoff_location}\n"
+                        f"- Date: {updated_res.pickup_date}\n"
+                        f"- Time: {updated_res.pickup_time}\n"
+                        f"- Passengers: {updated_res.passengers}\n"
+                        f"- Luggage: {updated_res.luggage}"
+                    )
+                finally:
+                    db2.close()
+                return f"Done! Your {target_field.replace('_', ' ')} has been updated to {value}.{summary}"
+            return "Sorry, I couldn't find that reservation."
+    # Comportement existant (fallback) pour les autres champs
+    for entity_key, column_name, conversion in FIELD_MAP:
+        value = entities.get(entity_key)
+        if value is None:
+            continue
+        if conversion == "time":
+            value = parse_time(str(value))
+        elif conversion == "date":
+            value = parse_date(str(value))
+        db = SessionLocal()
+        try:
+            ok = update_reservation(db, session["reservation_id"], column_name, value)
+        finally:
+            db.close()
+        if ok:
+            return f"Done! Your {column_name.replace('_', ' ')} has been updated to {value}."
+        return "Sorry, I couldn't find that reservation."
+
+    return None
+
+def handle_message(conversation_id: str | None, message: str) -> dict:
+    if not conversation_id or conversation_id not in SESSIONS:
+        conversation_id = str(uuid.uuid4())
+        SESSIONS[conversation_id] = _new_session()
+    session = SESSIONS[conversation_id]
+
+    intent = predict_intent(message)["intent"]
+    entities = extract_entities(message)
+    _scan_contact_info(session["slots"], message)
+
+    if session.get("expected") == "cancel_email" and session["slots"].get("email"):
+        session["expected"] = None
+        candidate_id = session["slots"].pop("_pending_cancel_id", None)
+        from app.database import SessionLocal
+        from app.models import User, Reservation
+        from app.services.reservation_service import cancel_reservation
+        db = SessionLocal()
+        try:
+            ok = cancel_reservation(db, candidate_id) if candidate_id else False
+        finally:
+            db.close()
+        if ok:
+            return _reply(conversation_id, f"Your reservation #{candidate_id} has been cancelled. We hope to see you again soon!")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+    if session.get("expected") == "modify_email" and session["slots"].get("email"):
+        session["expected"] = None
+        reservation_id = session["slots"].pop("_pending_modify_id", None)
+        if reservation_id:
+            session["reservation_id"] = reservation_id
+            session["expected"] = "modify_detail"
+            return _reply(conversation_id, "Sure! What would you like to change? (for example: change my pickup time to 5pm)")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+    if session.get("expected") == "modify_date_picker":
+        from app.services.reservation_service import update_reservation, parse_date
+        from app.database import SessionLocal
+        parsed = parse_date(message)
+        db = SessionLocal()
+        try:
+            ok = update_reservation(db, session["reservation_id"], "pickup_date", parsed)
+        finally:
+            db.close()
+        session["expected"] = None
+        if ok:
+            return _reply(conversation_id, f"Done! Your pickup date has been updated to {parsed}.")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+
+    if session.get("expected") == "pricing_locations":
+        _merge_entities(session["slots"], entities)
+        pickup = session["slots"].get("pickup_location")
+        dropoff = session["slots"].get("dropoff_location")
+        if pickup and dropoff:
+            session["expected"] = "pricing_vehicle"
+            return _reply(conversation_id, "What type of vehicle would you like? (Sedan, Executive SUV, Premium SUV, Transit VAN, Sprinter VAN, or No Preference)")
+        return _reply(conversation_id, "Could you give me both the pickup and destination?")
+
+    if session.get("expected") == "pricing_vehicle":
+        _fill_expected(session["slots"], "vehicle", message)
+        vehicle = session["slots"].get("vehicle")
+        if not vehicle:
+            if re.search(r"\b(recommend\w*|recommand\w*|suggest\w*|your choice|details|info|which (one|vehicle)|what.*(recommend|suggest))\b", message, re.I):
+                from app.database import SessionLocal
+                from app.services.reservation_service import recommend_vehicle
+                db = SessionLocal()
+                try:
+                    v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
+                finally:
+                    db.close()
+                vehicle = v.name if v else "Sedan"
+                session["slots"]["vehicle"] = vehicle
+            else:
+                return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, or Sprinter VAN.")
+        session["expected"] = "pricing_compare"
+        quote = _price_quote(session["slots"]["pickup_location"], session["slots"]["dropoff_location"], vehicle)
+        return _reply(conversation_id, quote)
+
+    if session.get("expected") == "pricing_compare":
+        VEHICLE_NAMES = ["Sedan", "Executive SUV", "Premium SUV", "Transit VAN", "Sprinter VAN"]
+        found = None
+        for name in VEHICLE_NAMES:
+            if name.lower() in message.lower():
+                found = name
+                break
+        if not found and re.search(r"\b(recommend\w*|recommand\w*|suggest\w*|your choice|details|info|which (one|vehicle))\b", message, re.I):
+            from app.database import SessionLocal
+            from app.services.reservation_service import recommend_vehicle
+            db = SessionLocal()
+            try:
+                                v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
+            finally:
+                db.close()
+            found = v.name if v else "Sedan"
+        if found:
+            session["slots"]["vehicle"] = found
+            return _reply(conversation_id, _price_quote(
+                session["slots"]["pickup_location"],
+                session["slots"]["dropoff_location"],
+                found
+            ))
+        session["expected"] = None
+        if intent in ("thanks", "goodbye"):
+            reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])
+            return _reply(conversation_id, reply)
+        return _reply(conversation_id, "Which vehicle would you like the price for? Or type 'book' to start a reservation.")
+
+    if session.get("expected") == "edit_field":
+        text = message.lower()
+        matched_key = None
+        for key, keywords in EDIT_FIELD_KEYWORDS.items():
+            if any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in keywords):
+                matched_key = key
+                break
+
+        if not matched_key:
+            return _reply(conversation_id,
+                "Sorry, which field would you like to change? (pickup, destination, date, time, "
+                "passengers, luggage, vehicle, name, phone, or email)")
+
+        # On vide le slot ciblé (et le prix, s'il dépend du trajet) puis on
+        # redemande sa valeur : le prochain message retombera dans le flux
+        # "collecting" normal (_merge_entities / _fill_expected), qui SAIT
+        # remplir un slot vide - contrairement à un slot déjà rempli.
+        session["slots"][matched_key] = None
+        if matched_key in ("pickup_location", "dropoff_location"):
+            session["slots"]["estimated_price"] = None
+        session["expected"] = matched_key
+        session["stage"] = "collecting"
+        return _reply(conversation_id, dict(REQUIRED_SLOTS)[matched_key])
+
+    if session.get("expected") == "modify_detail" and session.get("reservation_id"):
+        session["expected"] = None
+        confirmation = _apply_modification(session, entities, message)
+        if confirmation:
+            return _reply(conversation_id, confirmation)
+        if re.search(r"\bdate\b", message, re.I) and not re.search(r"\btime\b", message, re.I):
+            session["expected"] = "modify_date_picker"
+            return _reply(conversation_id, "What date would you like to travel?")
+        return _reply(conversation_id, "I didn't catch what to change. Try: 'change my pickup time to 5pm'.")
+
+    # =====================================================================
+    # Flux principal de réservation : collecte des slots puis confirmation
+    # =====================================================================
+    if session["stage"] in ("collecting", "confirming"):
+
+        if intent == "cancel_booking":
+            SESSIONS[conversation_id] = _new_session()
+            return _reply(conversation_id, "No problem, I've cancelled this booking process. Let me know if you need anything else!")
+
+        if session["stage"] == "confirming":
+            if re.search(r"\b(child seat|car seats?|booster)\b", message, re.I):
+                return _reply(conversation_id, "Sure! Child car seats and boosters are complimentary — no extra charge.\n\nYour reservation is still pending - would you like to confirm it?")
+            if intent == "confirm":
+                from app.database import SessionLocal
+                from app.services.reservation_service import is_vehicle_available, create_reservation, parse_date, parse_time, is_booking_in_advance
+
+                db = SessionLocal()
+                try:
+                    pickup_date = parse_date(str(session["slots"].get("date", "")))
+                    pickup_time = parse_time(str(session["slots"].get("time", "")))
+                    vehicle_name = session["slots"].get("vehicle")
+
+                    if not is_booking_in_advance(pickup_date, pickup_time):
+                        return _reply(conversation_id, "Sorry, reservations must be made at least 24 hours in advance. Please provide a different date or time.")
+                    session["stage"] = "completed"
+                    reservation = create_reservation(db, session["slots"])
+                    reservation_id = reservation.id
+                finally:
+                    db.close()
+                session["reservation_id"] = reservation_id
+                from app.models import Reservation
+                from app.services.email_service import send_confirmation_email
+                email_to = session["slots"].get("email")
+                if email_to:
+                    db2 = SessionLocal()
+                    try:
+                        res = db2.get(Reservation, reservation_id)
+                        send_confirmation_email(email_to, res)
+                    finally:
+                        db2.close()
+                session["slots"] = {k: v for k, v in session["slots"].items() if k in ("name", "phone", "email")}
+                return _reply(conversation_id,
+                    f"Your reservation has been successfully created!\n"
+                    f"Reservation number: {reservation_id}\n"
+                    f"A confirmation email will be sent to your address.\n"
+                    f"Thank you for choosing SmartLimo!")
+            if intent == "deny":
+                session["stage"] = "collecting"
+                session["expected"] = "edit_field"
+                return _reply(conversation_id, "No problem! What would you like to change?")
+            if intent in ("pricing", "payment", "vehicle_information", "help",
+                          "driver_tracking", "trip_history", "tip"):
+                info = INTENT_RESPONSES[intent]
+                return _reply(conversation_id, info + "\n\nYour reservation is still pending - would you like to confirm it?")
+            _merge_entities(session["slots"], entities)
+            return _reply(conversation_id, _summary(session["slots"]))
+
+        captured = _merge_entities(session["slots"], entities)
+        if not captured:
+            filled = _fill_expected(session["slots"], session["expected"], message)
+            if not filled:
+                expected_field = session["expected"]
+                if expected_field == "time":
+                    return _reply(conversation_id, "Please provide a specific time with AM or PM (for example: 5:00 PM or 5pm).")
+                elif expected_field in ("pickup_location", "dropoff_location"):
+                    return _reply(conversation_id, "I couldn't recognize this location. Please provide a valid address, airport, or landmark (for example: MCO Airport, Walt Disney World).")
+                elif expected_field == "date":
+                    return _reply(conversation_id, "Please provide a future date (today or later).")
+                elif expected_field == "passengers":
+                    return _reply(conversation_id, "Sorry, our largest vehicle accommodates up to 14 passengers. For larger groups, please contact us directly to arrange multiple vehicles.")
+
+        key, question = _next_missing(session["slots"])
+        if key:
+            session["expected"] = key
+            reco = _vehicle_prefix(session["slots"]) if key == "vehicle" else ""
+            return _reply(conversation_id, _acknowledge(captured, session["slots"]) + reco + question)
+        _compute_price(session["slots"])
+        session["stage"] = "confirming"
+        return _reply(conversation_id, _summary(session["slots"]))
+
+    # =====================================================================
+    # Hors flux de réservation : routage par intention
+    # =====================================================================
+
+    if intent == "cancel_booking":
+        num_match = RESERVATION_NUM_RE.search(message)
+        target_reservation_id = None
+
+        if num_match:
+            candidate_id = int(num_match.group(1))
+            email = session["slots"].get("email")
+            if email:
+                from app.database import SessionLocal
+                from app.models import Reservation, User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.email == email).first()
+                    if user:
+                        res = db.query(Reservation).filter(
+                            Reservation.id == candidate_id,
+                            Reservation.user_id == user.id
+                        ).first()
+                        if res:
+                            target_reservation_id = candidate_id
+                finally:
+                    db.close()
+
+        reservation_id = target_reservation_id or session.get("reservation_id")
+
+        if not reservation_id:
+            session["expected"] = "cancel_email"
+            session["slots"]["_pending_cancel_id"] = candidate_id if num_match else None
+            return _reply(conversation_id, "Could you give me your email so I can find that reservation?")
+        from app.database import SessionLocal
+        from app.services.reservation_service import cancel_reservation
+        db = SessionLocal()
+        try:
+            ok = cancel_reservation(db, reservation_id)
+        finally:
+            db.close()
+        if ok:
+            return _reply(conversation_id, f"Your reservation #{reservation_id} has been cancelled. We hope to see you again soon!")
+        return _reply(conversation_id, "Sorry, I couldn't find that reservation.")
+
+    if intent == "modify_booking":
+        num_match = RESERVATION_NUM_RE.search(message)
+        target_reservation_id = None
+
+        if num_match:
+            candidate_id = int(num_match.group(1))
+            email = session["slots"].get("email")
+            if email:
+                from app.database import SessionLocal
+                from app.models import Reservation, User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.email == email).first()
+                    if user:
+                        res = db.query(Reservation).filter(
+                            Reservation.id == candidate_id,
+                            Reservation.user_id == user.id
+                        ).first()
+                        if res:
+                            target_reservation_id = candidate_id
+                finally:
+                    db.close()
+
+        reservation_id = target_reservation_id or session.get("reservation_id")
+
+        if not reservation_id:
+                if num_match:
+                    session["expected"] = "modify_email"
+                    session["slots"]["_pending_modify_id"] = int(num_match.group(1))
+                    return _reply(conversation_id, "Could you give me your email so I can find that reservation?")
+                return _reply(conversation_id, "I don't see an active reservation to modify. Would you like to book one, or check your past reservations?")
+
+        session["reservation_id"] = reservation_id
+        confirmation = _apply_modification(session, entities, message)
+        if confirmation:
+            return _reply(conversation_id, confirmation)
+        session["expected"] = "modify_detail"
+        return _reply(conversation_id, "Sure! What would you like to change? (for example: change my pickup time to 5pm)")
+
+    if intent == "driver_tracking" and session.get("reservation_id"):
+        from app.database import SessionLocal
+        from app.services.reservation_service import get_reservation_route
+        db = SessionLocal()
+        try:
+            route = get_reservation_route(db, session["reservation_id"])
+        finally:
+            db.close()
+        if route:
+            return _reply(conversation_id,
+                f"Your trip is {route['distance_km']} km, about {route['duration_min']} min "
+                f"from your pickup to your destination.")
+        return _reply(conversation_id, "Sorry, I couldn't calculate the route for that reservation.")
+
+    if intent == "trip_history":
+        email = session["slots"].get("email")
+        if email:
+            return _reply(conversation_id, _lookup_history(email))
+        session["expected"] = "history_email"
+        return _reply(conversation_id, "Sure! May I have your email address to look up your reservations?")
+
+    if intent != "book_ride" and re.search(r"\b(child seat|car seats?|boosters?)\b", message, re.I):
+        return _reply(conversation_id, "Sure! Child car seats and boosters are complimentary — no extra charge.")
+
+   
+    
+    if intent == "vehicle_information":
+        return _reply(conversation_id, _vehicle_info())
+
+    if intent == "pricing":
+        _merge_entities(session["slots"], entities)
+        pickup = session["slots"].get("pickup_location")
+        dropoff = session["slots"].get("dropoff_location")
+
+        if not pickup or not dropoff:
+            session["expected"] = "pricing_locations"
+            return _reply(conversation_id, "Sure! Where would you like to travel from and to?")
+
+        if not session["slots"].get("vehicle"):
+            session["expected"] = "pricing_vehicle"
+            return _reply(conversation_id, "What type of vehicle would you like? (Sedan, Executive SUV, Premium SUV, Transit VAN, Sprinter VAN, or No Preference)")
+
+        return _reply(conversation_id, _price_quote(pickup, dropoff, session["slots"]["vehicle"]))
+
+    if intent == "book_ride":
+        session["stage"] = "collecting"
+        if CHILD_SEAT_REQUEST_RE.search(message):
+            session["slots"]["child_seat_requested"] = True
+        captured = _merge_entities(session["slots"], entities)
+        key, question = _next_missing(session["slots"])
+        if key:
+            session["expected"] = key
+            prefix = _acknowledge(captured, session["slots"]) or "Great! Let's book your ride.\n"
+            reco = _vehicle_prefix(session["slots"]) if key == "vehicle" else ""
+            return _reply(conversation_id, prefix + reco + question)
+        _compute_price(session["slots"])
+        session["stage"] = "confirming"
+        return _reply(conversation_id, _summary(session["slots"]))
+
+    if re.search(r"\b(meet and greet|meet & greet)\b", message, re.I):
+        return _reply(conversation_id, "Meet and Greet service is included at no extra charge — your driver will be there to welcome you.")
+
+    if intent == "tip":
+        if session.get("reservation_id") and session["slots"].get("estimated_price"):
+                return _reply(conversation_id, f"Gratuity is not automatically included. You're welcome to add a tip for your driver directly, at your discretion.")
+        return _reply(conversation_id, "You can add a tip for your driver at any time. Gratuity is not automatically included in the fare.")
+
+    reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])
+    return _reply(conversation_id, reply)
+
+
+def _reply(conversation_id: str, text: str) -> dict:
+    return {"conversation_id": conversation_id, "reply": text}
