@@ -4,8 +4,7 @@ import TripMap from "./TripMap";
 import { Check, Edit, X, Send, MapPin, Calendar, Clock, Users, Briefcase, Car, DollarSign, Baby } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-const API_URL = "https://smartlimo-ai-assistant-production.up.railway.app";
-
+const API_URL = import.meta.env.VITE_API_URL || "https://smartlimo-ai-assistant-production.up.railway.app";
 
 function Chatbot({ onClose }) {
   const [input, setInput] = useState("");
