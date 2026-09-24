@@ -8,8 +8,8 @@ rates. Idempotent : peut être relancé sans créer de doublons (upsert par
 clé naturelle - code de zone pour Zone, triplet véhicule/zone_from/zone_to
 pour Rate).
 
-Ne remplace PAS encore estimate_price (voir reservation_service.py) : ce
-script se contente de peupler les tables de la grille fixe.
+Peuple uniquement les tables de la grille fixe : le calcul de prix
+lui-même vit dans reservation_service.estimate_price_by_zone.
 """
 
 import os

@@ -13,12 +13,11 @@ from datetime import datetime, timedelta, date, time
 import dateparser
 from sqlalchemy.orm import Session
 
-from app.models import User, Reservation, Vehicle, Zone, Rate, ZoneZipcode, Surcharge
+from app.models import User, Reservation, Vehicle, Zone, Rate, Surcharge
 from app.services.geo_service import get_route
-from app.services.pricing_service import get_fixed_rate
-import datetime as dt
-from datetime import datetime, timedelta
 import re
+import holidays as holidays_lib
+
 
 def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
     """Verifie que la reservation est faite au moins min_hours avant le depart."""
@@ -27,8 +26,6 @@ def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool
     pickup_datetime = datetime.combine(pickup_date, pickup_time)
     now = datetime.now()
     return pickup_datetime - now >= timedelta(hours=min_hours)
-
-import holidays as holidays_lib
 
 
 def is_us_holiday(check_date) -> bool:
@@ -36,22 +33,6 @@ def is_us_holiday(check_date) -> bool:
     pour n'importe quelle annee (calcul dynamique, pas de liste figee)."""
     us_holidays = holidays_lib.UnitedStates(years=check_date.year)
     return check_date in us_holidays
-
-def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
-    """Verifie que la reservation est faite au moins min_hours avant le depart."""
-    if pickup_date is None or pickup_time is None:
-        return True
-    pickup_datetime = datetime.combine(pickup_date, pickup_time)
-    now = datetime.now()
-    return pickup_datetime - now >= timedelta(hours=min_hours)
-
-def is_booking_in_advance(pickup_date, pickup_time, min_hours: int = 24) -> bool:
-    """Verifie que la reservation est faite au moins min_hours avant le depart."""
-    if pickup_date is None or pickup_time is None:
-        return True  # pas assez d'info pour verifier, on laisse passer
-    pickup_datetime = datetime.combine(pickup_date, pickup_time)
-    now = datetime.now()
-    return pickup_datetime - now >= timedelta(hours=min_hours)
 
 def apply_surcharges(db: Session, base_price: float, pickup_time, pickup_date, pickup_location: str, dropoff_location: str) -> float:
     """Applique les suppléments simples (nuit, jour férié, frais aéroport/port)."""
@@ -184,11 +165,16 @@ def cancel_reservation(db: Session, reservation_id: int) -> bool:
     return False
 
 
-def get_user_reservations(db, email):
+def get_user_reservations(db, email=None, phone=None):
     """Retourne toutes les réservations actives (non annulées) associées à
-    l'email fourni (liste vide si l'email est inconnu ou si l'utilisateur
-    n'a aucune réservation)."""
-    user = db.query(User).filter(User.email == email).first()
+    l'email et/ou au téléphone fourni (liste vide si le client est inconnu
+    ou s'il n'a aucune réservation)."""
+    query = db.query(User)
+    if email:
+        query = query.filter(User.email == email)
+    if phone:
+        query = query.filter(User.phone == phone)
+    user = query.first()
     if user is None:
         return []
     return db.query(Reservation).filter(
@@ -246,23 +232,6 @@ def recommend_vehicle(db: Session, passengers: int, luggage: int = 0):
         Vehicle.capacity >= passengers,
         Vehicle.luggage >= luggage
     ).order_by(Vehicle.capacity).first()
-
-def estimate_price(db: Session, distance_km: float, vehicle_name: str = None,
-                    pickup_location: str = None, dropoff_location: str = None) -> float:
-    """Calcule le prix estimé d'une course. Priorité à la grille de
-    tarifs fixes (voir pricing_service.get_fixed_rate) si le trajet
-    (pickup/dropoff) et le véhicule y sont couverts. Sinon, calcul par
-    distance (comportement historique, conservé en repli) : un forfait de
-    base (10.0) + un tarif au kilomètre dépendant du véhicule choisi. Si
-    le véhicule n'est pas reconnu (ex: "No Preference" ou nom invalide),
-    on applique un tarif par défaut de 3.0/km plutôt que d'échouer."""
-    fixed_rate = get_fixed_rate(db, pickup_location, dropoff_location, vehicle_name)
-    if fixed_rate is not None:
-        return fixed_rate
-
-    vehicle = db.query(Vehicle).filter(Vehicle.name == vehicle_name).first()
-    ppk = vehicle.price_per_km if vehicle else 3.0
-    return round(10.0 + distance_km * ppk, 2)
 
 VEHICLE_NAME_TO_RATE_CODE = {
     "Sedan": "SEDAN",
@@ -372,14 +341,6 @@ def is_vehicle_available(db: Session, vehicle_name: str, pickup_date, pickup_tim
             return False
 
     return True
-
-def get_eligible_vehicles(db: Session, passengers: int, luggage: int = 0):
-    """Retourne la liste des vehicules dont la capacite est suffisante."""
-    vehicles = db.query(Vehicle).filter(
-        Vehicle.capacity >= passengers,
-        Vehicle.luggage >= luggage
-    ).order_by(Vehicle.capacity).all()
-    return [v.name for v in vehicles]
 
 def get_eligible_vehicles(db: Session, passengers: int, luggage: int = 0):
     """Retourne les vehicules dont la capacite est suffisante, tries du plus petit au plus grand."""

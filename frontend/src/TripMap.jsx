@@ -39,10 +39,12 @@ function TripMap({ pickupCoords, dropoffCoords, distanceKm, durationMin, geometr
         style={{ height: "220px", width: "100%" }}
         scrollWheelZoom={false}   // évite que le défilement de la page ne zoome accidentellement la carte
       >
-        {/* Tuiles CartoDB Voyager : le style pastel epure proche d'Apple Plans */}
+        {/* Tuiles OpenStreetMap standard : gratuites, sans cle API.
+            (CARTO exige desormais une cle API meme pour son style pastel
+            "Voyager" gratuit, d'ou ce repli.) */}
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; OpenStreetMap &copy; CARTO'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
         />
 
         <Marker position={pickupCoords} icon={dotIcon("#34C759")}>

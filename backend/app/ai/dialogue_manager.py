@@ -492,14 +492,33 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
         if not vehicle:
             if re.search(r"\b(recommend\w*|recommand\w*|suggest\w*|your choice|details|info|which (one|vehicle)|what.*(recommend|suggest))\b", message, re.I):
                 from app.database import SessionLocal
-                from app.services.reservation_service import recommend_vehicle
+                from app.services.reservation_service import recommend_vehicle, get_eligible_vehicles, estimate_price_by_zone
                 db = SessionLocal()
                 try:
-                    v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
+                    passengers = session["slots"].get("passengers") or 1
+                    luggage = session["slots"].get("luggage") or 0
+                    v = recommend_vehicle(db, passengers, luggage)
+                    eligible = get_eligible_vehicles(db, passengers, luggage)
+                    pickup = session["slots"]["pickup_location"]
+                    dropoff = session["slots"]["dropoff_location"]
+                    prices = {
+                        name: estimate_price_by_zone(db, pickup, dropoff, name)
+                        for name in eligible
+                    }
                 finally:
                     db.close()
-                vehicle = v.name if v else "Sedan"
-                session["slots"]["vehicle"] = vehicle
+                recommended = v.name if v else "Sedan"
+                session["slots"]["_recommended_vehicle"] = recommended
+                session["expected"] = "pricing_compare"
+                lines = ["Here's the price for each vehicle that fits your group:", ""]
+                for name in eligible:
+                    price = prices.get(name)
+                    price_str = f"${price}" if price is not None else "price on request"
+                    marker = " (recommended)" if name == recommended else ""
+                    lines.append(f"- {name}: {price_str}{marker}")
+                lines.append("")
+                lines.append(f"I'd suggest the {recommended}. Would you like to go with that, or pick another vehicle?")
+                return _reply(conversation_id, "\n".join(lines))
             else:
                 return _reply(conversation_id, "Sorry, I didn't catch the vehicle type. Please choose: Sedan, Executive SUV, Premium SUV, Transit VAN, or Sprinter VAN.")
         session["expected"] = "pricing_compare"
@@ -518,10 +537,12 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
             from app.services.reservation_service import recommend_vehicle
             db = SessionLocal()
             try:
-                                v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
+                v = recommend_vehicle(db, session["slots"].get("passengers") or 1, session["slots"].get("luggage") or 0)
             finally:
                 db.close()
             found = v.name if v else "Sedan"
+        if not found and session["slots"].get("_recommended_vehicle") and ACCEPT_RECO_RE.search(message):
+            found = session["slots"]["_recommended_vehicle"]
         if found:
             session["slots"]["vehicle"] = found
             return _reply(conversation_id, _price_quote(
@@ -529,6 +550,22 @@ def handle_message(conversation_id: str | None, message: str) -> dict:
                 session["slots"]["dropoff_location"],
                 found
             ))
+        # Reponse generique ("okay", "yes", "sounds good"...) apres un devis
+        # deja donne pour un vehicule precis : on enchaine directement sur la
+        # reservation plutot que de redemander quel vehicule, sinon
+        # l'utilisateur doit deviner qu'il faut taper "book" explicitement.
+        if session["slots"].get("vehicle") and ACCEPT_RECO_RE.search(message):
+            session["stage"] = "collecting"
+            captured = _merge_entities(session["slots"], entities)
+            key, question = _next_missing(session["slots"])
+            if key:
+                session["expected"] = key
+                prefix = _acknowledge(captured, session["slots"]) or "Great, let's get your ride booked!\n"
+                reco = _vehicle_prefix(session["slots"]) if key == "vehicle" else ""
+                return _reply(conversation_id, prefix + reco + question)
+            _compute_price(session["slots"])
+            session["stage"] = "confirming"
+            return _reply(conversation_id, _summary(session["slots"]))
         session["expected"] = None
         if intent in ("thanks", "goodbye"):
             reply = INTENT_RESPONSES.get(intent, INTENT_RESPONSES["unknown"])

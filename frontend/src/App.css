@@ -234,6 +234,15 @@ body {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
+/* Adoucit les tuiles OpenStreetMap (couleurs brutes/saturees) pour se
+   rapprocher du rendu pastel "Apple Plans" sans dependre d'une cle API
+   externe (CARTO). Approximation par filtre CSS, pas un vrai restylage
+   vectoriel : les libelles/couleurs de rue restent ceux d'OSM, juste
+   attenues. */
+.trip-map .leaflet-tile-pane {
+  filter: saturate(0.55) brightness(1.12) contrast(0.92) hue-rotate(-6deg);
+}
+
 .trip-info {
   background: #ffffff;
   border-radius: 12px;

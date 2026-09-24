@@ -147,7 +147,8 @@ class Rate(Base):
     de destination. `vehicle_code` reste le code brut de la grille
     (CHEVY/ESCALADE/GMC/SPRINTER/TRANSIT) et n'est PAS encore relié à
     Vehicle.name (voir le mapping à valider dans import_pricing.py) :
-    ce lien sera fait au moment où estimate_price sera réécrit.
+    ce lien est fait dans reservation_service.VEHICLE_NAME_TO_RATE_CODE,
+    utilisé par estimate_price_by_zone.
     tolls/parking/tax1/tax2 sont nullable car vides dans le template
     actuel, mais la grille peut les remplir plus tard."""
     __tablename__ = "rates"
